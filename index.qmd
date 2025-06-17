@@ -1,15 +1,13 @@
 ---
-title: "Palmer Penguins"
-subtitle: "A great dataset for data exploration & visualization"
+title: "Refbank"
+subtitle: "An open repository of conversation data from referential communication tasks"
 description: |
-  Data were collected and made available by [Dr. Kristen Gorman](https://www.uaf.edu/cfos/people/faculty/detail/kristen-gorman.php) and the [Palmer Station, Antarctica LTER](https://pallter.marine.rutgers.edu/), a member of the [Long Term Ecological Research Network](https://lternet.edu/).
+  Iterated reference games have been used extensively as a paradigm to study communication, pragmatics, and convention formation. These games have varied along a number of dimensions, including design features (e.g., number of participants, communication capacity) and analytic targets (e.g., change in accuracy over trials, change in description length over trials). We introduce RefBank, an effort to harmonise iterated reference game data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of language.
 ---
 
-::: {layout-ncol=2}
-![Artwork by \@allison_horst](images/lter_penguins.png)
-
-![](images/culmen_depth.png)
-:::
+<!-- ::: {layout-ncol=2} -->
+<!-- ![](images/tangram.png) -->
+<!-- ::: -->
 
 {{< include _load-data.qmd >}}
 

@@ -1,14 +1,33 @@
 project:
   title: "refbank"
-  type: datapage
+  type: website
 
 website:
   navbar:
     logo: images/logo.png
+    left:
+      - href: data.qmd
+        text: Data
+      - href: contributors.qmd
+        text: Contributors
+      - href: analysis.qmd
+        text: Analysis
+      - href: about.qmd
+        text: About
 
 format:
-  datapage-html:
-    theme: theme.scss
+  html:
+    title-block-banner: var(--bs-light)
+    title-block-banner-color: var(--bs-body-color)
+    theme: [cosmo, theme.scss]
+    mainfont: Nunito Sans
+    fontsize: 1rem
+    grid:
+      sidebar-width: 0px
+      body-width: 1200px
+      margin-width: 0px
+    shortcodes:
+      - _extensions/redivis.lua
 
 execute: 
   echo: false

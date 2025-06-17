@@ -1,14 +1,15 @@
 ## Programmatic access
 
-You can access the {{< meta redivis.dataset >}} data programmatically using the Redivis API for [R](https://apidocs.redivis.com/client-libraries/redivis-r) or [Python](https://apidocs.redivis.com/client-libraries/redivis-python).
+You can access refbank data in R through the `refbank` package or directly using the Redivis API for  [Python](https://apidocs.redivis.com/client-libraries/redivis-python).
 
 ::: {.panel-tabset}
 
 ## R
 
-1. Install the redivis-r package:
+1. Install the `refbankr` R package:
+
 ```{.r}
-devtools::install_github("redivis/redivis-r")
+remotes::install_github("refbank/refbankr")
 ```
 
 2. [Generate and set an API token](https://apidocs.redivis.com/client-libraries/redivis-r/getting-started#authentication).
@@ -16,21 +17,27 @@ devtools::install_github("redivis/redivis-r")
 3. Access the data:
 
 ```{.r}
-library(redivis)
-
-user <- redivis::user("{{< meta redivis.user >}}")
-dataset <- user$dataset("{{< meta redivis.dataset >}}")
-table <- dataset$table("{{< meta redivis.table >}}")
+library(refbankr)
 
 # Load table as tidyverse tibble
-df <- table$to_tibble()
+datasets <- get_datasets()
+
+# trial-level information about stimuli
+trials <- get_trials()
+
+# information about participant choices on each trial
+choices <- get_choices()
+
+# language data for each trial
+messages <- get_messages()
 ```
 
-[View documentation](https://apidocs.redivis.com/client-libraries/redivis-r)
+See [refbankr github repository](https://github.com/refbank/refbankr) for more information.
 
 ## Python
 
 1. Install the redivis-python client library:
+
 ```{.python}
 pip install --upgrade redivis
 ```
@@ -38,6 +45,7 @@ pip install --upgrade redivis
 2. [Generate and set an API token](https://apidocs.redivis.com/client-libraries/redivis-python/getting-started#authentication).
 
 3. Access the data:
+
 ```{.python}
 import redivis
 
