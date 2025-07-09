@@ -1,1 +1,1 @@
-Sitemap: https://refbank.github.io/refbank-datapage/sitemap.xml
+Sitemap: https://refbank.github.io/sitemap.xml

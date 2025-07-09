@@ -155,7 +155,8 @@ background: var(--bs-light);
   <div class="about-contents"><main class="content quarto-banner-title-block" id="quarto-document-content">
 <section id="refbank" class="level2">
 <h2 data-anchor-id="refbank">refbank</h2>
-<p>Refbank is an open repository of conversation data from referential communication tasks. It is an effort to harmonise iterated reference game data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of the emergence of new referring expressions.</p>
+<p>Iterated reference games have been used extensively as a paradigm to study communication, pragmatics, and convention formation. These games have varied along a number of dimensions, including design features (e.g., number of participants, communication capacity) and analytic targets (e.g., change in accuracy over trials, change in description length over trials).</p>
+<p>Refbank is an open repository of conversation data from such iterated referential communication tasks. It is an effort to harmonise iterated reference game data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of the emergence of new referring expressions.</p>
 <p>Data are available under a <a href="https://creativecommons.org/public-domain/cc-by-nc/">CC-BY-NC</a> license.</p>
 <!-- Data were collected and made available by [Dr. Kristen Gorman](https://www.uaf.edu/cfos/people/faculty/detail/kristen-gorman.php) and the [Palmer Station, Antarctica LTER](https://pallter.marine.rutgers.edu/), a member of the [Long Term Ecological Research Network](https://lternet.edu/). The dataset contains data for 344 penguins. There are 3 different species of penguins in this dataset, collected from 3 islands in the Palmer Archipelago, Antarctica. -->
 <!-- Data are available by [CC-0](https://creativecommons.org/public-domain/cc0/) license in accordance with the [Palmer Station LTER Data Policy](https://pallter.marine.rutgers.edu/data/) and the [LTER Data Access Policy for Type I data](https://lternet.edu/data-access-policy/). -->
@@ -243,7 +244,7 @@ background: var(--bs-light);
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/refbank\.github\.io\/refbank-datapage\/");
+        var filterRegex = new RegExp("https:\/\/refbank\.github\.io\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
