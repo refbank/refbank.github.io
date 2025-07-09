@@ -15,7 +15,9 @@ about:
 
 ## refbank
 
-Refbank is an open repository of conversation data from referential communication tasks. It is an effort to harmonise iterated reference game data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of the emergence of new referring expressions.
+Iterated reference games have been used extensively as a paradigm to study communication, pragmatics, and convention formation. These games have varied along a number of dimensions, including design features (e.g., number of participants, communication capacity) and analytic targets (e.g., change in accuracy over trials, change in description length over trials).
+
+Refbank is an open repository of conversation data from such iterated referential communication tasks. It is an effort to harmonise iterated reference game data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of the emergence of new referring expressions. 
   
 Data are available under a [CC-BY-NC](https://creativecommons.org/public-domain/cc-by-nc/) license.
 
