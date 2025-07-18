@@ -22,7 +22,10 @@ library(refbankr)
 # Load table as tidyverse tibble
 datasets <- get_datasets()
 
-# trial-level information about stimuli
+# experiment-level information about the conditions
+conditions <- get_conditions()
+
+# trial-level information about who was in the trial, what the stimuli were, and when in a game it occurred
 trials <- get_trials()
 
 # information about participant choices on each trial
@@ -30,6 +33,64 @@ choices <- get_choices()
 
 # language data for each trial
 messages <- get_messages()
+
+# meta-data about stimuli
+images <- get_images()
+
+# meta-data about participants
+participants <- get_players()
+
+```
+
+By default, functions return all datasets in the current version of the data, but you can specify a different version, or a specific set of datasets.
+
+```{.r}
+# learn what the current version number is
+get_current_version()
+
+# specify a specific version
+# or specific datasets
+trials <- get_trials(version="7.3", datasets=c("hawkins2023_frompartners", "hawkins2021_respect"))
+```
+
+For testing, you can limit the number of results retrieved. 
+
+```{.r}
+trials <- get_trials(max_results=100)
+# this is non-deterministic in which items are returned
+```
+
+For convenience, you can get some tables with other tables joined in already. 
+
+```{.r}
+messages <- get_messages(include_trial_data=T,
+                         include_player_data=T,
+                         include_image_data=T,
+                         include_condition_data=T)
+                         
+choices <- get_choices(include_trial_data=T,
+                       include_player_data=T,
+                       include_image_data=T,
+                       include_condition_data=T)
+
+
+trials <- get_trials(include_image_data=T,
+                    include_condition_data=T)
+                         
+```
+
+You can also download the image files where available. 
+
+```{.r}
+download_image_files(destination="images/")
+```
+
+In addition to the primary data tables, there are also derived tables of processed data, such as vector embeddings of the describer language on each trial, and cosine similarities between these embeddings. 
+
+```{.r}
+embeddings <- get_sbert_embeddings()
+
+similarities <- get_cosine_similarities(sim_type=c("to_last"))
 ```
 
 See [refbankr github repository](https://github.com/refbank/refbankr) for more information.
