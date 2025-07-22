@@ -40,13 +40,12 @@ if ("redivis" %in% names(quarto) &&
 Plot = import("https://esm.sh/@observablehq/plot@0.6.13")
 d = transpose(data)
 
-distinct_cutoff = 1
 
 disc_types = ['string', 'boolean']
-disc_vars = vars.filter(d => disc_types.includes(d.type) && d.statistics.numDistinct <= distinct_cutoff).map(d => [d.label ? d.label : d.name, d.name])
+disc_vars = vars.filter(d => disc_types.includes(d.type)).map(d => [d.label ? d.label : d.name, d.name])
 disc_opts = new Map([['', null]].concat(disc_vars))
 
 cont_types = ['integer', 'float', 'date', 'datetime', 'time']
-cont_vars = vars.filter(d => cont_types.includes(d.type) && d.statistics.numDistinct > distinct_cutoff).map(d => [d.label ? d.label : d.name, d.name])
+cont_vars = vars.filter(d => cont_types.includes(d.type)).map(d => [d.label ? d.label : d.name, d.name])
 cont_opts = new Map(cont_vars)
 ```
