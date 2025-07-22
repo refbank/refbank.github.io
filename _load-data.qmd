@@ -40,7 +40,7 @@ if ("redivis" %in% names(quarto) &&
 Plot = import("https://esm.sh/@observablehq/plot@0.6.13")
 d = transpose(data)
 
-distinct_cutoff = 10
+distinct_cutoff = 1
 
 disc_types = ['string', 'boolean']
 disc_vars = vars.filter(d => disc_types.includes(d.type) && d.statistics.numDistinct <= distinct_cutoff).map(d => [d.label ? d.label : d.name, d.name])
