@@ -38,4 +38,4 @@ execute:
 redivis:
   user: mcfrank
   dataset: refbank
-  table: trials
+  table: summary
