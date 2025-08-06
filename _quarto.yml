@@ -7,7 +7,7 @@ website:
     logo: images/logo.png
     left:
       - href: data.qmd
-        text: Data
+        text: Visualizations
       - href: contributors.qmd
         text: Contributors
       - href: analysis.qmd
