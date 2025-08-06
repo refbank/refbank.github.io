@@ -5,15 +5,10 @@ description: |
   Refbank is an open repository of data from iterated reference games, collating and harmonising data from multiple datasets to enable the testing of cross-study moderators as well as robust, larger-scale analyses of language.
 ---
 
-<!-- ::: {layout-ncol=2} -->
-<!-- ![](images/tangram.png) -->
-<!-- ::: -->
+
 
 {{< include _load-data.qmd >}}
 
 {{< include _scatter_hist.qmd >}}
 
-<!-- {{< include _scatter.qmd >}} -->
-
-<!-- {{< include _hist.qmd >}} -->
 

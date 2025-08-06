@@ -1,3 +1,4 @@
-{{< redivis-table >}}
+```{=html}
+<iframe src="https://langcog.shinyapps.io/refbank-viz/"></iframe>
 
-<!-- {{< redivis-table datapages.palmerpenguins.penguins >}} -->
+```
