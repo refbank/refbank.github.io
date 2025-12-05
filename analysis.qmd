@@ -2,6 +2,8 @@
 
 You can access refbank data in R through the `refbank` package or directly using the Redivis API for  [Python](https://apidocs.redivis.com/client-libraries/redivis-python).
 
+The [codebook](https://docs.google.com/spreadsheets/d/18HW1tlVA9USzpaNXZzu2bdfaRNwWdwuOGvgbqSEUbk0/edit?usp=sharing) contains descriptions of all tables and what each column means. 
+
 ::: {.panel-tabset}
 
 ## R

@@ -1,19 +1,20 @@
 project:
-  title: "refbank"
+  title: "Refbank"
   type: website
 
 website:
   navbar:
-    logo: images/logo.png
+    logo: images/logo_small.png
     left:
       - href: data.qmd
         text: Visualizations
       - href: contributors.qmd
-        text: Contributors
+        text: Datasets
       - href: analysis.qmd
-        text: Analysis
+        text: Access Data
       - href: about.qmd
         text: About
+  favicon: images/logo_small.png
 
 format:
   html:

@@ -1,7 +1,7 @@
 ---
 about:
   template: trestles
-  image: images/tangram.png
+  image: images/logo_big.png
   image-width: 100%
   links:
     - icon: github
