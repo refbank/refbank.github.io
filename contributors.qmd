@@ -1,1 +1,1 @@
-{{< redivis-table mcfrank.refbank.datasets >}} 
+{{< redivis-table datapages.refbank.datasets >}} 

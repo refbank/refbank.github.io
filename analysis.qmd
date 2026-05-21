@@ -44,6 +44,16 @@ participants <- get_players()
 
 ```
 
+There are also pre-computed summary tables that give a quick overview of the data without downloading full tables.
+
+```{.r}
+# summary stats aggregated per game
+per_game_summary <- get_per_game_summary()
+
+# counts of data per dataset and condition
+dataset_summary <- get_dataset_summary()
+```
+
 By default, functions return all datasets in the current version of the data, but you can specify a different version, or a specific set of datasets.
 
 ```{.r}
@@ -87,12 +97,20 @@ You can also download the image files where available.
 download_image_files(destination="images/")
 ```
 
-In addition to the primary data tables, there are also derived tables of processed data, such as vector embeddings of the describer language on each trial, and cosine similarities between these embeddings. 
+In addition to the primary data tables, there are also derived tables of processed data, including vector embeddings, cosine similarities, linguistic parses, and message annotations.
 
 ```{.r}
 embeddings <- get_sbert_embeddings()
 
-similarities <- get_cosine_similarities(sim_type=c("to_last"))
+# available sim_type values:
+# "to_last", "to_next", "to_first", "diverge", "diff", "idiosyncrasy"
+similarities <- get_cosine_similarities(sim_type = c("to_last", "to_first"))
+
+# stanza-parsed linguistic output for each message
+parsed <- get_parsed_messages()
+
+# human or model annotations for messages
+annotated <- get_annotated_messages()
 ```
 
 See [refbankr github repository](https://github.com/refbank/refbankr) for more information.
@@ -112,8 +130,8 @@ pip install --upgrade redivis
 ```{.python}
 import redivis
 
-user = redivis.user("{{< meta redivis.user >}}")
-dataset = user.dataset("{{< meta redivis.dataset >}}")
+organization = redivis.organization("{{< meta redivis.organization >}}")
+dataset = organization.dataset("{{< meta redivis.dataset >}}")
 table = dataset.table("{{< meta redivis.table >}}")
 
 # Load table as a dataframe

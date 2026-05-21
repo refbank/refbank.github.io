@@ -37,6 +37,6 @@ execute:
   error: false
 
 redivis:
-  user: mcfrank
+  organization: datapages
   dataset: refbank
   table: summary
