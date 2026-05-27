@@ -35,7 +35,11 @@ return {
     -- if no table given, default to redivis key in metadata
     else
       redivis = meta['redivis']
-      user = pandoc.utils.stringify(redivis['user'])
+      if redivis['organization'] then
+        account = pandoc.utils.stringify(redivis['organization'])
+      else
+        account = pandoc.utils.stringify(redivis['user'])
+      end
       if redivis['project'] then
         dataset = pandoc.utils.stringify(redivis['project'])
       end
@@ -43,7 +47,7 @@ return {
         dataset = pandoc.utils.stringify(redivis['dataset'])
       end
       table = pandoc.utils.stringify(redivis['table'])
-      embed_id = user .. '.' .. dataset .. '.' .. table
+      embed_id = account .. '.' .. dataset .. '.' .. table
     end
     return makeEmbed(embed_id, 'tables', kwargs)
   end,

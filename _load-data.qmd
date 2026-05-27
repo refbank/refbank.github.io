@@ -9,14 +9,21 @@ quarto <- yaml::read_yaml("_quarto.yml")
 
 # load data from redivis table if specified in yaml
 if ("redivis" %in% names(quarto) &&
-  all(c("user", "table") %in% names(quarto$redivis)) && # need user and table
+  all(c("table") %in% names(quarto$redivis)) && # need table
+  any(c("user", "organization") %in% names(quarto$redivis)) && # need user or organization
   any(c("dataset", "project") %in% names(quarto$redivis))) { # need dataset or project
+  # get the account (user or organization)
+  if (!is.null(quarto$redivis$organization)) {
+    account <- redivis::organization(quarto$redivis$organization)
+  } else {
+    account <- redivis::user(quarto$redivis$user)
+  }
   if (!is.null(quarto$redivis$dataset)) {
     # use dataset if provided
-    dataset <- redivis::user(quarto$redivis$user)$dataset(quarto$redivis$dataset)
+    dataset <- account$dataset(quarto$redivis$dataset)
   } else {
     # otherwise use project
-    dataset <- redivis::user(quarto$redivis$user)$project(quarto$redivis$project)
+    dataset <- account$project(quarto$redivis$project)
   }
 
   # get table data
