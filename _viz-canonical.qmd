@@ -1,0 +1,42 @@
+```{ojs}
+{
+  document.getElementById("viz-loading")?.remove()
+  return linePlot(filtered.filter(d => Number.isFinite(d.words)), {
+    y: "words",
+    title: "Reduction: Total speaker utterance length across repetitions",
+    yLabel: "Length (words)",
+    ylim: [0, 60],
+    groupingVar: grouping,
+    facetVar: faceting,
+    indivLines: indiv_lines,
+    stageOneOnly: stage_one_only,
+    containerWidth: mainWidth
+  })
+}
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.accuracy)), {
+  y: "accuracy",
+  title: "Accuracy across repetitions",
+  yLabel: "Accuracy",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.rt)), {
+  y: "rt",
+  title: "Response time across repetitions",
+  yLabel: "Response time (s)",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```

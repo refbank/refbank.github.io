@@ -1,0 +1,877 @@
+```{ojs}
+//| output: false
+Plot = import("https://esm.sh/@observablehq/plot@0.6.13")
+jStat = (await import("https://esm.sh/jstat@1.9.6")).default
+
+game_summary_rows = transpose(game_summary)
+
+// The ambient `width` reactive tracks the whole page content column (~1200px),
+// not our narrower `.viz-main` sidebar-layout column — bind to the actual
+// rendered content width instead. We track `.viz-main .tab-content`
+// (Bootstrap's tabset wrapper), not `.viz-main` itself: Bootstrap gives
+// `.tab-content` its own 1em left/right padding that `.viz-main` knows
+// nothing about, so sizing off `.viz-main`'s outer width always made plots
+// ~32px wider than the space actually available inside the tabs — a
+// constant overflow into a horizontal scrollbar at every window width.
+// `.tab-content` (unlike the individual `.tab-pane`s) stays in the layout
+// and keeps a nonzero size no matter which tab is active, so it's safe to
+// observe even while the visualization's tab isn't the visible one.
+// This cell runs early (from an include near the top of data.qmd), before the
+// page HTML further down defines `.viz-main`, so wait for it via
+// MutationObserver rather than assuming it's already in the DOM.
+// A plain generator cell (not `viewof` — that's for interactive input
+// widgets Observable attaches its own event listeners to; this just yields
+// successive width values over time).
+mainWidth = {
+  const selector = ".viz-main .tab-content";
+  let el = document.querySelector(selector);
+  if (!el) {
+    el = await new Promise(resolve => {
+      const obs = new MutationObserver(() => {
+        const found = document.querySelector(selector);
+        if (found) {
+          obs.disconnect();
+          resolve(found);
+        }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+  // Content-box width (padding excluded) — what's actually left over for
+  // children to render into, not the element's own outer box.
+  const contentWidth = () => {
+    const cs = getComputedStyle(el);
+    return el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
+  // `Generators.width` isn't available in this stdlib bundle — track width
+  // directly with a ResizeObserver instead.
+  yield contentWidth();
+  let notify;
+  const ro = new ResizeObserver(() => notify?.(contentWidth()));
+  ro.observe(el);
+  while (true) {
+    yield await new Promise(resolve => { notify = resolve; });
+  }
+}
+```
+
+```{ojs}
+//| output: false
+// Two-handle range slider, ported from the Observable "range-slider" notebook
+// (https://observablehq.com/@mootari/range-slider) via
+// https://github.com/levante-framework/levante-datapage/blob/main/components/_interval.qmd
+// rather than reinventing one. `interval()`/`rangeInput()`/`randomScope()`/
+// `cssLength()`/`theme_Flat` are unmodified from that source (the notebook's
+// own `html = htl.html` line is dropped — `html` is already the ambient
+// Quarto/Observable stdlib binding used everywhere else in this file).
+
+function interval(range = [], options = {}) {
+  const [min = 0, max = 1] = range;
+  const {
+    step = .001,
+    label = null,
+    value = [min, max],
+    format = ([start, end]) => `${start} … ${end}`,
+    color,
+    width,
+    theme,
+    __ns__ = randomScope(),
+  } = options;
+
+  const css = `
+#${__ns__} {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  max-width: 100%;
+  width: auto;
+  flex-direction: column;
+}
+@media only screen and (min-width: 30em) {
+  #${__ns__} {
+    flex-wrap: nowrap;
+    width: 360px;
+  }
+}
+#${__ns__} .label {
+  flex-shrink: 0;
+}
+#${__ns__} .form {
+  display: flex;
+  width: 100%;
+}
+#${__ns__} .range {
+  flex-shrink: 1;
+  width: 100%;
+}
+#${__ns__} .range-slider {
+  width: 100%;
+  margin-bottom: .3em;
+  margin-top: .3em;
+}
+  `;
+
+  const $range = rangeInput({min, max, value: [value[0], value[1]], step, color, width, theme});
+  const $output = html`<output>`;
+  const $view = html`<div id=${__ns__}>
+${label == null ? '' : html`<div class="label">${label}`}
+<div class=form>
+  <div class=range>
+    ${$range}<div class=range-output>${$output}</div>
+  </div>
+</div>
+${html`<style>${css}`}
+  `;
+
+  const update = () => {
+    const content = format([$range.value[0], $range.value[1]]);
+    if(typeof content === 'string') $output.value = content;
+    else {
+      while($output.lastChild) $output.lastChild.remove();
+      $output.appendChild(content);
+    }
+  };
+  $range.oninput = update;
+  update();
+
+  return Object.defineProperty($view, 'value', {
+    get: () => $range.value,
+    set: ([a, b]) => {
+      $range.value = [a, b];
+      update();
+    },
+  });
+}
+
+function rangeInput(options = {}) {
+  const {
+    min = 0,
+    max = 100,
+    step = 'any',
+    value: defaultValue = [min, max],
+    color,
+    width,
+    theme = theme_Flat,
+  } = options;
+
+  const controls = {};
+  const scope = randomScope();
+  const clamp = (a, b, v) => v < a ? a : v > b ? b : v;
+
+  // Will be used to sanitize values while avoiding floating point issues.
+  const input = html`<input type=range ${{min, max, step}}>`;
+
+  const dom = html`<div class=${`${scope} range-slider`} style=${{
+    color,
+    width: cssLength(width),
+  }}>
+  ${controls.track = html`<div class="range-track">
+    ${controls.zone = html`<div class="range-track-zone">
+      ${controls.range = html`<div class="range-select" tabindex=0>
+        ${controls.min = html`<div class="thumb thumb-min" tabindex=0>`}
+        ${controls.max = html`<div class="thumb thumb-max" tabindex=0>`}
+      `}
+    `}
+  `}
+  ${html`<style>${theme.replace(/:scope\b/g, '.'+scope)}`}
+</div>`;
+
+  let value = [], changed = false;
+  Object.defineProperty(dom, 'value', {
+    get: () => [...value],
+    set: ([a, b]) => {
+      value = sanitize(a, b);
+      updateRange();
+    },
+  });
+
+  const sanitize = (a, b) => {
+    a = isNaN(a) ? min : ((input.value = a), input.valueAsNumber);
+    b = isNaN(b) ? max : ((input.value = b), input.valueAsNumber);
+    return [Math.min(a, b), Math.max(a, b)];
+  }
+
+  const updateRange = () => {
+    const ratio = v => (v - min) / (max - min);
+    dom.style.setProperty('--range-min', `${ratio(value[0]) * 100}%`);
+    dom.style.setProperty('--range-max', `${ratio(value[1]) * 100}%`);
+  };
+
+  const dispatch = name => {
+    dom.dispatchEvent(new Event(name, {bubbles: true}));
+  };
+  const setValue = (vmin, vmax) => {
+    const [pmin, pmax] = value;
+    value = sanitize(vmin, vmax);
+    updateRange();
+    // Only dispatch if values have changed.
+    if(pmin === value[0] && pmax === value[1]) return;
+    dispatch('input');
+    changed = true;
+  };
+
+  setValue(...defaultValue);
+
+  // Mousemove handlers.
+  const handlers = new Map([
+    [controls.min, (dt, ov) => {
+      const v = clamp(min, ov[1], ov[0] + dt * (max - min));
+      setValue(v, ov[1]);
+    }],
+    [controls.max, (dt, ov) => {
+      const v = clamp(ov[0], max, ov[1] + dt * (max - min));
+      setValue(ov[0], v);
+    }],
+    [controls.range, (dt, ov) => {
+      const d = ov[1] - ov[0];
+      const v = clamp(min, max - d, ov[0] + dt * (max - min));
+      setValue(v, v + d);
+    }],
+  ]);
+
+  // Returns client offset object.
+  const pointer = e => e.touches ? e.touches[0] : e;
+  // Note: Chrome defaults "passive" for touch events to true.
+  const on  = (e, fn) => e.split(' ').map(e => document.addEventListener(e, fn, {passive: false}));
+  const off = (e, fn) => e.split(' ').map(e => document.removeEventListener(e, fn, {passive: false}));
+
+  let initialX, initialV, target, dragging = false;
+  function handleDrag(e) {
+    // Gracefully handle exit and reentry of the viewport.
+    if(!e.buttons && !e.touches) {
+      handleDragStop();
+      return;
+    }
+    dragging = true;
+    const w = controls.zone.getBoundingClientRect().width;
+    e.preventDefault();
+    handlers.get(target)((pointer(e).clientX - initialX) / w, initialV);
+  }
+
+  function handleDragStop(e) {
+    off('mousemove touchmove', handleDrag);
+    off('mouseup touchend', handleDragStop);
+    if(changed) dispatch('change');
+  }
+
+  invalidation.then(handleDragStop);
+
+  dom.ontouchstart = dom.onmousedown = e => {
+    dragging = false;
+    changed = false;
+    if(!handlers.has(e.target)) return;
+    on('mousemove touchmove', handleDrag);
+    on('mouseup touchend', handleDragStop);
+    e.preventDefault();
+    e.stopPropagation();
+
+    target = e.target;
+    initialX = pointer(e).clientX;
+    initialV = value.slice();
+  };
+
+  controls.track.onclick = e => {
+    if(dragging) return;
+    changed = false;
+    const r = controls.zone.getBoundingClientRect();
+    const t = clamp(0, 1, (pointer(e).clientX - r.left) / r.width);
+    const v = min + t * (max - min);
+    const [vmin, vmax] = value, d = vmax - vmin;
+    if(v < vmin) setValue(v, v + d);
+    else if(v > vmax) setValue(v - d, v);
+    if(changed) dispatch('change');
+  };
+
+  return dom;
+}
+
+function randomScope(prefix = 'scope-') {
+  return prefix + (performance.now() + Math.random()).toString(32).replace('.', '-');
+}
+
+cssLength = v => v == null ? null : typeof v === 'number' ? `${v}px` : `${v}`
+
+theme_Flat = `
+/* Options */
+:scope {
+  color: #3b99fc;
+  width: 240px;
+}
+
+:scope {
+  position: relative;
+  display: inline-block;
+  --thumb-size: 15px;
+  --thumb-radius: calc(var(--thumb-size) / 2);
+  margin: 2px;
+  vertical-align: middle;
+}
+:scope .range-track {
+  box-sizing: border-box;
+  position: relative;
+  height: 7px;
+  background-color: hsl(0, 0%, 80%);
+  overflow: visible;
+  border-radius: 4px;
+  padding: 0 var(--thumb-radius);
+}
+:scope .range-track-zone {
+  box-sizing: border-box;
+  position: relative;
+}
+:scope .range-select {
+  box-sizing: border-box;
+  position: relative;
+  left: var(--range-min);
+  width: calc(var(--range-max) - var(--range-min));
+  cursor: ew-resize;
+  background: currentColor;
+  height: 7px;
+  border: inherit;
+}
+/* Expands the hotspot area. */
+:scope .range-select:before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: var(--thumb-size);
+  left: 0;
+  top: calc(2px - var(--thumb-radius));
+}
+:scope .range-select:focus,
+:scope .thumb:focus {
+  outline: none;
+}
+:scope .thumb {
+  box-sizing: border-box;
+  position: absolute;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+
+  background: #fcfcfc;
+  top: -4px;
+  border-radius: 100%;
+  border: 1px solid hsl(0,0%,55%);
+  cursor: default;
+  margin: 0;
+}
+:scope .thumb:active {
+  box-shadow: inset 0 var(--thumb-size) #0002;
+}
+:scope .thumb-min {
+  left: calc(-1px - var(--thumb-radius));
+}
+:scope .thumb-max {
+  right: calc(-1px - var(--thumb-radius));
+}
+`
+```
+
+```{ojs}
+//| output: false
+// A two-handle range slider over a discrete, possibly non-uniformly-spaced
+// choice array (repetition numbers, or the group/option-size values present in
+// the data). Wraps `interval()` above, operating on indices so the two handles
+// are always evenly spaced regardless of the underlying values' spacing;
+// `format`/`.value` map back to the actual values. Returns a <form> so it
+// participates in the same label-on-top sidebar styling as every other filter
+// control.
+function rangeSlider(choices, { label, defaultRange } = {}) {
+  const [defaultLo, defaultHi] = defaultRange ?? [0, choices.length - 1];
+  const slider = interval([0, choices.length - 1], {
+    step: 1,
+    value: [defaultLo, defaultHi],
+    color: "#0d6efd",
+    width: "100%",
+    format: ([lo, hi]) => `${choices[Math.round(lo)]} – ${choices[Math.round(hi)]}`
+  });
+  const form = html`<form><label>${label}</label><div class="viz-range-slider">${slider}</div></form>`;
+  Object.defineProperty(form, "value", {
+    get: () => slider.value.map(i => Number(choices[Math.round(i)]))
+  });
+  slider.addEventListener("input", () => form.dispatchEvent(new Event("input", { bubbles: true })));
+  return form;
+}
+```
+
+```{ojs}
+//| output: false
+// group_size and option_size are ordered numeric variables with an open-ended
+// set of levels (new group/option sizes show up as datasets are added — e.g.
+// option_size gained 18 and 36 after this was first written) — a sequential
+// D3 interpolator scaled to whatever levels are actually present adapts
+// automatically, unlike a hardcoded value→color lookup that silently falls
+// back to flat grey for anything it wasn't updated to include.
+// `reverse: true` matches the low→high, light→dark direction the original
+// hand-picked palettes (ported from theme.R's GRP_SIZE_COL_SCALE /
+// OPT_SIZE_COL_SCALE) used.
+orderedColorScales = ({
+  group_size: { interpolator: d3.interpolateViridis, reverse: true },
+  option_size: { interpolator: d3.interpolateMagma, reverse: true }
+})
+
+// information_availability_composite isn't a smooth quantity in the same way
+// (it's a composite of a few discrete conditions) — a hand-picked qualitative
+// palette suits it better than a forced gradient. Groupings not listed here
+// (dataset_id, modality, backchannel, feedback, role_constancy) fall back to
+// Plot's default categorical scheme.
+colorScales = ({
+  information_availability_composite: new Map([
+    ["0.5", "#fbb4ae"], ["1", "#fed9a6"], ["1.5", "#e5d8bd"], ["2", "#ccebc5"],
+    ["2.5", "#b3cde3"], ["3", "#decbe4"], ["3.5", "#fddaec"]
+  ])
+})
+
+// PoS analyses hardcodes pos_type as a grouping/facet variable — content words
+// before function words, not alphabetical (DET, FUNCTION, MODIFIER, NOUN, PRON,
+// VERB) — ported verbatim from app.R's explicit `factor(pos_type, levels = ...)`.
+// np_type has no such override in app.R (falls back to alphabetical there too).
+fixedOrders = ({
+  pos_type: ["NOUN", "VERB", "MODIFIER", "DET", "PRON", "FUNCTION"]
+})
+
+// Consistent color domain/range for a grouping variable, shared across every facet panel
+// (each panel only sees a subset of rows, so the domain must be computed from the full set).
+function colorSpec(rows, groupingVar) {
+  const rawLevels = Array.from(new Set(rows.map(d => d[groupingVar])))
+  const fixedOrder = fixedOrders[groupingVar]
+  // Sort numerically when every level parses as a number (group_size, option_size,
+  // information_availability_composite, ...) so the legend/facet order is 2, 4, 6, ...
+  // rather than the lexicographic "10, 12, ..., 2, 4, ..." a plain string sort gives.
+  const allNumeric = rawLevels.every(v => Number.isFinite(Number(v)))
+  const domain = fixedOrder
+    ? fixedOrder.filter(level => rawLevels.map(String).includes(level))
+    : rawLevels
+        .map(String)
+        .sort(allNumeric ? (a, b) => Number(a) - Number(b) : d3.ascending)
+
+  const ordered = orderedColorScales[groupingVar]
+  const special = colorScales[groupingVar]
+  const range = ordered
+    ? (() => {
+        const nums = domain.map(Number)
+        const [lo, hi] = d3.extent(nums)
+        return nums.map(v => {
+          const t = hi === lo ? 0.5 : (v - lo) / (hi - lo)
+          return ordered.interpolator(ordered.reverse ? 1 - t : t)
+        })
+      })()
+    : special
+    ? domain.map(level => special.get(level) ?? "#999999")
+    : domain.map((_, i) => d3.schemeTableau10[i % d3.schemeTableau10.length])
+  return { domain, range }
+}
+```
+
+```{ojs}
+//| output: false
+// Weighted least squares fit of y ~ log(x), weighted by `weight` — mirrors
+// lm(y ~ log(x), weights = trials) from app.R's make_line_plot/make_stack_plot.
+// Returns a predict(x) => {y, lo, hi} function (95% CI band), or null if there
+// isn't enough data to fit (fewer than 3 valid points, or zero x-variance).
+function weightedLogTrend(rows, { x, y, weight }) {
+  const pts = rows
+    .map(r => ({ xt: Math.log(r[x]), y: r[y], w: r[weight] }))
+    .filter(p => Number.isFinite(p.xt) && Number.isFinite(p.y) && Number.isFinite(p.w) && p.w > 0)
+
+  const n = pts.length
+  if (n < 3) return null
+
+  const W = d3.sum(pts, p => p.w)
+  const xtbar = d3.sum(pts, p => p.w * p.xt) / W
+  const ybar = d3.sum(pts, p => p.w * p.y) / W
+  const Sxy = d3.sum(pts, p => p.w * (p.xt - xtbar) * (p.y - ybar))
+  const Sxx = d3.sum(pts, p => p.w * (p.xt - xtbar) ** 2)
+  if (Sxx === 0) return null
+
+  const slope = Sxy / Sxx
+  const intercept = ybar - slope * xtbar
+  const df = n - 2
+  const residSS = d3.sum(pts, p => p.w * (p.y - (intercept + slope * p.xt)) ** 2)
+  const sigma2 = residSS / df
+  const tcrit = jStat.studentt.inv(0.975, df)
+
+  return function predict(xVal) {
+    const xt = Math.log(xVal)
+    const yhat = intercept + slope * xt
+    const se = Math.sqrt(sigma2 * (1 / W + ((xt - xtbar) ** 2) / Sxx))
+    return { y: yhat, lo: yhat - tcrit * se, hi: yhat + tcrit * se }
+  }
+}
+
+// Adds a trend line (and, if withCI, a ribbon) fit to `rows` onto `marks`, spanning
+// the observed x-range of those rows. No-ops if weightedLogTrend can't fit a line.
+// `facet`, if given, is a constant `{fx, fy}` identifying which facet panel this
+// trend belongs to — stamped onto every synthetic point of the fitted curve (real
+// data rows carry their own fx/fy via a row accessor; these synthetic ones don't,
+// so the value has to be attached directly) and passed to each mark as `fx: "fx"`.
+function addTrend(marks, rows, { x, y, weight }, color, withCI, facet) {
+  const predict = weightedLogTrend(rows, { x, y, weight })
+  if (!predict) return
+
+  const xs = rows.map(d => d[x]).filter(v => v > 0)
+  const xMin = d3.min(xs), xMax = d3.max(xs)
+  if (xMin == null || xMax == null || xMin === xMax) return
+
+  const grid = d3.range(0, 51).map(i => xMin + (i / 50) * (xMax - xMin))
+  const predicted = grid.map(xVal => ({ x: xVal, ...predict(xVal), ...facet }))
+  const facetChannels = facet ? { fx: "fx", fy: "fy" } : {}
+
+  if (withCI) {
+    marks.push(Plot.areaY(predicted, { x: "x", y1: "lo", y2: "hi", fill: color ?? "black", fillOpacity: 0.35, ...facetChannels }))
+  }
+  // White halo behind the dashed trend line so it stays legible over dense,
+  // low-opacity spaghetti lines of the same or similar hue.
+  marks.push(Plot.line(predicted, { x: "x", y: "y", stroke: "white", strokeWidth: 7, strokeOpacity: 0.9, ...facetChannels }))
+  marks.push(Plot.line(predicted, { x: "x", y: "y", stroke: color ?? "black", strokeDasharray: "6,3", strokeWidth: 3, ...facetChannels }))
+}
+```
+
+```{ojs}
+//| output: false
+// Wraps facet levels of `rows[col]` into a grid with `ncol` columns, the same
+// way ggplot's `facet_wrap` does — ported from levante-datapage's scores.qmd,
+// which uses Observable Plot's native fx/fy faceting instead of building one
+// independent Plot.plot() per level. That's the approach here too: a single
+// plot with per-mark fx/fy channels lets Plot own scale/tick/margin layout
+// consistently across panels (and wrap to multiple rows), instead of us
+// re-deriving per-panel width/height/margins by hand.
+// `fxOf`/`fyOf` take a raw facet *key* (for tagging synthetic trend points,
+// which don't carry the original row's columns); row-accessor versions for
+// mark channels are built from them at the call site.
+function facetWrap(rows, col, ncol) {
+  const fixedOrder = fixedOrders[col]
+  const present = new Set(rows.map(d => d[col]))
+  const keys = fixedOrder
+    ? fixedOrder.filter(key => present.has(key))
+    : Array.from(present).sort((a, b) => d3.ascending(a, b))
+  const index = new Map(keys.map((key, i) => [key, i]))
+  const fxOf = key => index.get(key) % ncol
+  const fyOf = key => Math.floor(index.get(key) / ncol)
+  return { keys, fxOf, fyOf }
+}
+```
+
+```{ojs}
+//| output: false
+// Mirrors app.R's make_line_plot: groupingVar === "dataset_id" is the "no explicit
+// grouping" sentinel — points still colored by dataset, but the legend is hidden and
+// a single aggregate trend (with CI ribbon) is drawn instead of one trend per color
+// level. facetVar === "dataset_id" is the equivalent "no facet" sentinel.
+// `groupLabel`/`facetLabel` override the friendly name normally looked up from
+// groupingOpts/facetingOpts (the sidebar's own "Color by"/"Facet by" choices) —
+// needed when a plot hardcodes a grouping/facet variable the sidebar doesn't
+// offer (e.g. the PoS tab always colors its NP-type plot by `np_type` and always
+// facets its POS-fraction plot by `pos_type`, regardless of the sidebar's own
+// selections for those).
+function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, indivLines, stageOneOnly, containerWidth, groupLabel, facetLabel }) {
+  const xVar = "rep_num", weight = "trials"
+  const isDefaultGrouping = groupingVar === "dataset_id"
+  const isFaceted = facetVar !== "dataset_id"
+  const spec = colorSpec(rows, groupingVar)
+  const showLegend = !isDefaultGrouping
+
+  const MAX_PLOT_WIDTH = 900, MIN_PANEL_WIDTH = 220
+  const plotWidth = containerWidth ? Math.min(MAX_PLOT_WIDTH, Math.max(360, containerWidth)) : 760
+
+  // Facet grid shape: as many columns as fit at MIN_PANEL_WIDTH, capped at the
+  // number of facet levels (no point in empty trailing columns), wrapping to
+  // additional rows — a real 2D wrap, unlike Plot's native single-row `fx`
+  // facets (which the migration advice doc notes don't wrap past ~4 panels).
+  // Plot's fx/fy faceting always renders the full ncol×nrow cross product, so
+  // a column count that doesn't evenly divide the facet count leaves a blank
+  // panel in the last row — that's fine (an empty cell costs nothing) and
+  // preferred over dropping to fewer, wider-spaced columns just to avoid one:
+  // always take the width-driven max, never trade columns away for a clean
+  // divisor.
+  let facetKeys = null, fxOf = null, fyOf = null, ncol = 1, nrow = 1
+  if (isFaceted) {
+    const n = Array.from(d3.union(rows.map(d => d[facetVar]))).length
+    ncol = Math.max(1, Math.min(n, Math.floor(plotWidth / MIN_PANEL_WIDTH)))
+    ;({ keys: facetKeys, fxOf, fyOf } = facetWrap(rows, facetVar, ncol))
+    nrow = Math.ceil(facetKeys.length / ncol)
+  }
+  const panelWidth = isFaceted ? Math.floor(plotWidth / ncol) : plotWidth
+  const fxRow = isFaceted ? (d => fxOf(d[facetVar])) : undefined
+  const fyRow = isFaceted ? (d => fyOf(d[facetVar])) : undefined
+  const facetChannels = isFaceted ? { fx: fxRow, fy: fyRow } : {}
+
+  // Keep a stable aspect ratio as the page resizes rather than the fixed
+  // height Plot defaults to (which made plots look squat on wide screens and
+  // cramped on narrow ones). Faceted panels are narrower, so they get a
+  // taller (less wide) ratio to stay legible; clamped so neither a very
+  // narrow nor a very wide window produces an unreadable plot.
+  const ASPECT_SINGLE = 2, ASPECT_FACETED = 4 / 3
+  const MIN_PLOT_HEIGHT = 260, MAX_PLOT_HEIGHT = 480
+  const panelHeight = Math.round(Math.min(MAX_PLOT_HEIGHT, Math.max(MIN_PLOT_HEIGHT,
+    panelWidth / (isFaceted ? ASPECT_FACETED : ASPECT_SINGLE))))
+
+  // Color domains are strings (see colorSpec), so the channel must coerce too —
+  // otherwise numeric columns like group_size/option_size won't match the domain.
+  const colorChannel = d => String(d[groupingVar])
+
+  // Ticks beyond the data's actual x-extent (e.g. the Repetition filter
+  // narrowed to 1–6, but the full possible range is 1–13): a plain
+  // `Plot.plot()` silently drops out-of-domain ticks, but with fx/fy
+  // faceting Plot still tries to place all of them, projecting the
+  // out-of-domain ones past the frame edge and into the next panel's space.
+  // Filtering to the observed extent up front sidesteps that entirely.
+  const xExtent = d3.extent(rows, d => d[xVar])
+  const xTicks = d3.range(1, 14).filter(t => t >= xExtent[0] && t <= xExtent[1])
+
+  // Winsorize the plotted y-value to the declared ylim: without a fixed
+  // domain Plot would draw points above it straight through the top margin,
+  // into the axis-label area. Only the drawn marks are capped — the trend
+  // fits below still use the true, uncapped values.
+  const yValue = ylim ? (d => Math.min(ylim[1], Math.max(ylim[0], d[y]))) : (d => d[y])
+
+  const marks = []
+
+  // Facet strip labels otherwise show just the raw value (e.g. "2"), which
+  // is meaningless out of context — prefix with the friendly name of the
+  // faceted variable (e.g. "Group size: 2"), ported from levante's
+  // `facet_wrap`-adjacent `Plot.text(keys, {fx, fy, ...})` label pattern.
+  // Negative `dy` lifts the label out of the frame entirely, into the
+  // reserved `facet.marginTop` gap above it (see Plot.plot below) — inside
+  // the frame it sat on top of data lines/dots often enough to be unreadable.
+  if (isFaceted) {
+    const facetName = facetLabel ?? Array.from(facetingOpts).find(([, key]) => key === facetVar)?.[0]
+    marks.push(Plot.text(facetKeys, {
+      fx: fxOf, fy: fyOf, text: k => `${facetName}: ${k}`,
+      frameAnchor: "top", dy: -14, fontWeight: 600, fontSize: "1rem"
+    }))
+  }
+
+  if (indivLines) {
+    marks.push(Plot.line(rows, { x: xVar, y: yValue, z: "game_id", stroke: colorChannel, strokeOpacity: 0.05, ...facetChannels }))
+  }
+  marks.push(Plot.dot(rows, { x: xVar, y: yValue, fill: colorChannel, fillOpacity: 0.3, stroke: null, r: 2.5, ...facetChannels }))
+
+  // Trend lines are fit once per (facet panel × color level × stage) combination —
+  // faceting and coloring both narrow the rows a trend is fit to, independent of
+  // each other.
+  const facetTargets = isFaceted ? d3.groups(rows, d => d[facetVar]) : [[null, rows]]
+  for (const [facetKey, facetRows] of facetTargets) {
+    const facetTag = isFaceted ? { fx: fxOf(facetKey), fy: fyOf(facetKey) } : undefined
+    if (isDefaultGrouping) {
+      const trendGroups = stageOneOnly
+        ? [facetRows]
+        : d3.groups(facetRows, d => d.stage_num).map(([, rs]) => rs)
+      for (const trendRows of trendGroups) {
+        addTrend(marks, trendRows, { x: xVar, y, weight }, "black", true, facetTag)
+      }
+    } else {
+      for (const [level, levelRows] of d3.groups(facetRows, d => d[groupingVar])) {
+        const color = spec.range[spec.domain.indexOf(String(level))]
+        const trendGroups = stageOneOnly
+          ? [levelRows]
+          : d3.groups(levelRows, d => d.stage_num).map(([, rs]) => rs)
+        for (const trendRows of trendGroups) {
+          addTrend(marks, trendRows, { x: xVar, y, weight }, color, false, facetTag)
+        }
+      }
+    }
+  }
+
+  // No fx/fy here — Plot repeats marks without a facet channel across every
+  // panel automatically, so one `ruleY` covers the whole grid.
+  marks.push(Plot.ruleY([0]))
+
+  // Extra vertical room per row for the facet label lifted above the frame
+  // (see `dy: -8` above), and extra horizontal gap between columns — Plot's
+  // default `fx` band padding (0.1) wasn't enough breathing room once the
+  // axis font size grew, so adjacent panels' tick numbers (e.g. one panel's
+  // "6" and the next panel's "7") ran into each other.
+  const FACET_MARGIN_TOP = 32
+  const PLOT_MARGIN_LEFT = 48, PLOT_MARGIN_RIGHT = 30
+  const plot = Plot.plot({
+    style: { fontFamily: "var(--sans-serif)", fontSize: "1rem" },
+    width: plotWidth,
+    height: panelHeight * nrow + (isFaceted ? FACET_MARGIN_TOP * nrow : 0),
+    // Set explicitly (rather than left to Plot's own auto-computed default)
+    // so `xCaption` below can align itself to the plotting area in pixels.
+    marginLeft: PLOT_MARGIN_LEFT,
+    marginRight: PLOT_MARGIN_RIGHT,
+    // Default marginTop (20px) was too tight for the y-axis label — it
+    // collided with data points at or near the top of the frame.
+    marginTop: 35,
+    grid: true,
+    // Explicit integer tick values (not `interval`, which quantizes the underlying
+    // data too — that turned the smooth log-trend line into a staircase).
+    // No axis `label` here — Plot's default draws it to the right of the last
+    // tick, on the same baseline as the tick numbers, which collided with the
+    // "6" tick once the axis font size grew. A caption below the plot (added
+    // by hand, see `xCaption`) avoids that entirely.
+    x: { ticks: xTicks, tickFormat: "d", label: null },
+    y: { label: yLabel, domain: ylim ?? undefined },
+    fx: isFaceted ? { padding: 0.1 } : undefined,
+    fy: isFaceted ? { padding: 0.15 } : undefined,
+    color: { ...spec, legend: false },
+    // Hides Plot's own fx/fy tick-label axes — the hand-drawn facet strip
+    // labels above stand in for them. `marginTop` reserves the room the
+    // lifted-out label (`dy: -8` above) needs so it doesn't collide with the
+    // row above it.
+    facet: isFaceted ? { axis: null, marginTop: FACET_MARGIN_TOP } : undefined,
+    marks
+  })
+
+  const heading = html`<h3 style="font-size: 1.35rem; font-weight: 600; margin: 0 0 0.5rem;">${title}</h3>`
+  // Matches the y-axis label's size/color (Plot's default text fill, at the
+  // plot's 1rem font size) rather than a smaller muted caption — the two are
+  // both axis titles and should read as a matched pair.
+  // Right-aligned to the last *filled* column, not the full grid width — with
+  // a blank trailing cell (see the facet grid shape comment above), the last
+  // row doesn't reach every column, and the caption would otherwise float
+  // under empty space instead of the rightmost real panel.
+  const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
+  const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
+  const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition →</div>`
+
+  if (!showLegend) return html`<div>${heading}${plot}${xCaption}</div>`
+
+  // `label` option is a no-op for "swatches" (categorical) legends — it only
+  // applies to continuous "ramp" legends — so the title is added by hand, on
+  // the same row as the swatches instead of stacked above them.
+  // 1rem throughout — the sidebar text/axis labels are the minimum size for
+  // any text on the page, and Plot.legend's own default is smaller than that.
+  const legendTitle = groupLabel ?? Array.from(groupingOpts).find(([, key]) => key === groupingVar)?.[0] ?? groupingVar
+  const legendEl = html`<div style="margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1rem;">
+    <div style="font-weight: 600;">${legendTitle}:</div>
+    ${Plot.legend({ color: { ...spec, legend: true }, style: { fontSize: "1rem" } })}
+  </div>`
+  return html`<div>${heading}${plot}${xCaption}${legendEl}</div>`
+}
+```
+
+```{ojs}
+//| output: false
+// pivot_longer equivalent: one output row per (input row × column in `columns`),
+// each carrying that column's name (as `keyName`) and value (as `valueName`).
+// Used for the PoS tab's NP-type and POS-fraction plots, which each melt a
+// handful of per_game_summary's wide fraction columns into a single long
+// column pair before treating the former column name as a grouping/facet
+// variable in its own right.
+function meltRows(rows, columns, keyName, valueName) {
+  const out = []
+  for (const d of rows) {
+    for (const col of columns) {
+      out.push({ ...d, [keyName]: col, [valueName]: d[col] })
+    }
+  }
+  return out
+}
+```
+
+```{ojs}
+//| output: false
+// Mirrors app.R's make_stack_plot: a stacked-area chart of mean(y) per
+// repetition, stacked by `groupingVar` (always POS type on the PoS tab — this
+// has no "color by dataset_id" default-grouping sentinel the way linePlot
+// does, since a stack always needs an actual categorical variable to stack
+// by). Shares linePlot's facet-grid sizing/labeling/caption/legend chrome;
+// the only real difference is the mark itself (Plot.stackY'd areas instead of
+// dots + trend lines).
+function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWidth, groupLabel, facetLabel }) {
+  const xVar = "rep_num"
+  const isFaceted = facetVar !== "dataset_id"
+  const spec = colorSpec(rows, groupingVar)
+
+  const MAX_PLOT_WIDTH = 900, MIN_PANEL_WIDTH = 220
+  const plotWidth = containerWidth ? Math.min(MAX_PLOT_WIDTH, Math.max(360, containerWidth)) : 760
+
+  let facetKeys = null, fxOf = null, fyOf = null, ncol = 1, nrow = 1
+  if (isFaceted) {
+    const n = Array.from(d3.union(rows.map(d => d[facetVar]))).length
+    ncol = Math.max(1, Math.min(n, Math.floor(plotWidth / MIN_PANEL_WIDTH)))
+    ;({ keys: facetKeys, fxOf, fyOf } = facetWrap(rows, facetVar, ncol))
+    nrow = Math.ceil(facetKeys.length / ncol)
+  }
+  const panelWidth = isFaceted ? Math.floor(plotWidth / ncol) : plotWidth
+  const ASPECT_SINGLE = 2, ASPECT_FACETED = 4 / 3
+  const MIN_PLOT_HEIGHT = 260, MAX_PLOT_HEIGHT = 480
+  const panelHeight = Math.round(Math.min(MAX_PLOT_HEIGHT, Math.max(MIN_PLOT_HEIGHT,
+    panelWidth / (isFaceted ? ASPECT_FACETED : ASPECT_SINGLE))))
+
+  // Aggregate to mean(y) per repetition × facet level × grouping level —
+  // `d3.rollup`'s nested Map needs manual flattening back into plain rows.
+  const finite = rows.filter(d => Number.isFinite(d[y]))
+  const rolled = isFaceted
+    ? d3.rollup(finite, vs => d3.mean(vs, d => d[y]), d => d[xVar], d => d[facetVar], d => d[groupingVar])
+    : d3.rollup(finite, vs => d3.mean(vs, d => d[y]), d => d[xVar], d => d[groupingVar])
+  const agg = []
+  for (const [xVal, rest] of rolled) {
+    if (isFaceted) {
+      for (const [facetVal, groupMap] of rest) {
+        for (const [groupVal, meanY] of groupMap) {
+          agg.push({ [xVar]: xVal, [facetVar]: facetVal, [groupingVar]: groupVal, y: meanY })
+        }
+      }
+    } else {
+      for (const [groupVal, meanY] of rest) {
+        agg.push({ [xVar]: xVal, [groupingVar]: groupVal, y: meanY })
+      }
+    }
+  }
+  // `d3.rollup`'s Map iterates in first-seen (data) order, not sorted — Plot's
+  // area mark connects points in array order without re-sorting them, so an
+  // unsorted `agg` drew a zigzagging, self-intersecting shape instead of a
+  // clean area. Sort by x primarily (continuity within each z-series is what
+  // matters for the area shape) and by group secondarily (keeps same-x points
+  // adjacent, which is what Plot's stack transform expects).
+  agg.sort((a, b) => d3.ascending(a[xVar], b[xVar]) || d3.ascending(String(a[groupingVar]), String(b[groupingVar])))
+
+  const xExtent = d3.extent(rows, d => d[xVar])
+  const xTicks = d3.range(1, 14).filter(t => t >= xExtent[0] && t <= xExtent[1])
+  const facetChannels = isFaceted ? { fx: d => fxOf(d[facetVar]), fy: d => fyOf(d[facetVar]) } : {}
+
+  const marks = []
+  if (isFaceted) {
+    const facetName = facetLabel ?? Array.from(facetingOpts).find(([, key]) => key === facetVar)?.[0]
+    marks.push(Plot.text(facetKeys, {
+      fx: fxOf, fy: fyOf, text: k => `${facetName}: ${k}`,
+      frameAnchor: "top", dy: -14, fontWeight: 600, fontSize: "1rem"
+    }))
+  }
+  // `order: spec.domain` keeps the stack order matching the legend order
+  // (colorSpec respects fixedOrders, e.g. pos_type's content-before-function
+  // order) rather than Plot's own default appearance-order heuristic.
+  marks.push(Plot.areaY(agg, Plot.stackY({
+    x: xVar, y: "y", z: groupingVar, fill: d => String(d[groupingVar]), order: spec.domain,
+    ...facetChannels
+  })))
+  marks.push(Plot.ruleY([0]))
+
+  const FACET_MARGIN_TOP = 32
+  const PLOT_MARGIN_LEFT = 48, PLOT_MARGIN_RIGHT = 30
+  const plot = Plot.plot({
+    style: { fontFamily: "var(--sans-serif)", fontSize: "1rem" },
+    width: plotWidth,
+    height: panelHeight * nrow + (isFaceted ? FACET_MARGIN_TOP * nrow : 0),
+    marginLeft: PLOT_MARGIN_LEFT,
+    marginRight: PLOT_MARGIN_RIGHT,
+    marginTop: 35,
+    grid: true,
+    x: { ticks: xTicks, tickFormat: "d", label: null },
+    y: { label: yLabel, domain: [0, 1] },
+    fx: isFaceted ? { padding: 0.1 } : undefined,
+    fy: isFaceted ? { padding: 0.15 } : undefined,
+    color: { ...spec, legend: false },
+    facet: isFaceted ? { axis: null, marginTop: FACET_MARGIN_TOP } : undefined,
+    marks
+  })
+
+  const heading = html`<h3 style="font-size: 1.35rem; font-weight: 600; margin: 0 0 0.5rem;">${title}</h3>`
+  const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
+  const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
+  const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition →</div>`
+
+  const legendTitle = groupLabel ?? Array.from(groupingOpts).find(([, key]) => key === groupingVar)?.[0] ?? groupingVar
+  const legendEl = html`<div style="margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1rem;">
+    <div style="font-weight: 600;">${legendTitle}:</div>
+    ${Plot.legend({ color: { ...spec, legend: true }, style: { fontSize: "1rem" } })}
+  </div>`
+  return html`<div>${heading}${plot}${xCaption}${legendEl}</div>`
+}
+```

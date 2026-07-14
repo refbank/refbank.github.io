@@ -1,4 +1,35 @@
-```{=html}
-<iframe src="https://langcog.shinyapps.io/refbank-viz/" style="width:100%; height:100%"></iframe>
+{{< include _load-viz-data.qmd >}}
 
+{{< include _viz-helpers.qmd >}}
+
+```{=html}
+<div class="viz-layout">
+<div class="viz-sidebar">
+```
+
+{{< include _viz-filters.qmd >}}
+
+```{=html}
+</div>
+<div class="viz-main">
+<div id="viz-loading">Loading…</div>
+```
+
+::: {.panel-tabset}
+## Canonical analyses
+
+{{< include _viz-canonical.qmd >}}
+
+## PoS analyses
+
+{{< include _viz-pos.qmd >}}
+
+## Embedding analyses
+
+{{< include _viz-embedding.qmd >}}
+:::
+
+```{=html}
+</div>
+</div>
 ```

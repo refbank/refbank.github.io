@@ -1,0 +1,94 @@
+```{ojs}
+//| output: false
+
+// Choice sets are derived from the data, mirroring app.R's `sort(unique(df$...))`.
+// feedback/backchannel use the same fixed 3-level scale app.R hardcodes.
+group_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.group_size)))).sort((a, b) => a - b)
+option_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.option_size)))).sort((a, b) => a - b)
+rep_choices = d3.range(1, 14)
+population_choices = Array.from(new Set(game_summary_rows.map(d => d.population))).sort()
+modality_choices = Array.from(new Set(game_summary_rows.map(d => d.modality))).sort()
+dataset_choices = Array.from(new Set(game_summary_rows.map(d => d.dataset_id))).sort()
+
+groupingOpts = new Map([
+  ["Dataset", "dataset_id"],
+  ["Group size", "group_size"],
+  ["Information availability", "information_availability_composite"],
+  ["Option set size", "option_size"],
+  ["Modality", "modality"],
+  ["Backchannel", "backchannel"],
+  ["Feedback", "feedback"],
+  ["Role constancy", "role_constancy"]
+])
+facetingOpts = new Map([["None", "dataset_id"]].concat(Array.from(groupingOpts).slice(1)))
+```
+
+```{ojs}
+//| panel: input
+
+viewof rep_range = rangeSlider(rep_choices, { label: "Repetition", defaultRange: [0, 5] })
+viewof group_size_range = rangeSlider(group_size_choices, { label: "Group size" })
+viewof option_size_range = rangeSlider(option_size_choices, { label: "Option set size" })
+
+viewof population = Inputs.checkbox(population_choices, { value: population_choices, label: "Age groups" })
+viewof modality = Inputs.checkbox(modality_choices, { value: modality_choices, label: "Modality" })
+viewof feedback = Inputs.checkbox(["none", "limited", "full"], { value: ["none", "limited", "full"], label: "Feedback on selection accuracy" })
+viewof backchannel = Inputs.checkbox(["none", "limited", "full"], { value: ["none", "limited", "full"], label: "Matcher backchannel" })
+viewof partner_constancy = Inputs.checkbox(new Map([["Swaps", "no"], ["No swaps", "yes"]]), { value: ["no", "yes"], label: "Partner constancy" })
+
+viewof grouping = Inputs.select(groupingOpts, { value: "dataset_id", label: "Color by" })
+viewof faceting = Inputs.select(facetingOpts, { value: "dataset_id", label: "Facet by" })
+
+viewof indiv_lines = Inputs.toggle({ value: true, label: "Show lines per game" })
+viewof stage_one_only = Inputs.toggle({ value: true, label: "Only include first stage data" })
+
+// Select-all/none buttons sit in their own row right after the "Dataset" label
+// (and before the checkbox list) — a sibling, not appended into the label, so
+// "Dataset" stays on its own line with the buttons together underneath. The
+// form's native value/events (used by Observable's viewof binding) pass through
+// untouched since we only insert a sibling, not wrap the form itself.
+viewof dataset = {
+  const checkboxInput = Inputs.checkbox(dataset_choices, {
+    value: dataset_choices.filter(d => d !== "yoon2019_audience"),
+    label: "Datasets"
+  });
+  // Marker class so theme.scss can force one-dataset-per-row on this
+  // specific checkbox group, without affecting the short lists (age
+  // groups, modality, ...) that read fine wrapped onto shared rows.
+  checkboxInput.classList.add("viz-dataset-checkboxes");
+  const selectAll = html`<button type="button" class="viz-select-btn">Select all</button>`;
+  const selectNone = html`<button type="button" class="viz-select-btn">Select none</button>`;
+  const setValue = (v) => {
+    checkboxInput.value = v;
+    checkboxInput.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  selectAll.onclick = () => setValue(dataset_choices);
+  selectNone.onclick = () => setValue([]);
+  // Own class so the one-per-row rule for the dataset checkbox list (below)
+  // doesn't also stack these two buttons onto separate rows.
+  const buttonRow = html`<div class="viz-select-buttons">${selectAll}${selectNone}</div>`;
+  checkboxInput.querySelector("label").after(buttonRow);
+  return checkboxInput;
+}
+```
+
+```{ojs}
+//| output: false
+filtered = {
+  const [repLo, repHi] = rep_range
+  const [groupSizeLo, groupSizeHi] = group_size_range
+  const [optionSizeLo, optionSizeHi] = option_size_range
+  return game_summary_rows.filter(d =>
+    (!stage_one_only || d.stage_num === 1) &&
+    dataset.includes(d.dataset_id) &&
+    repLo <= d.rep_num && d.rep_num <= repHi &&
+    groupSizeLo <= Number(d.group_size) && Number(d.group_size) <= groupSizeHi &&
+    optionSizeLo <= Number(d.option_size) && Number(d.option_size) <= optionSizeHi &&
+    population.includes(d.population) &&
+    modality.includes(d.modality) &&
+    feedback.includes(d.feedback) &&
+    backchannel.includes(d.backchannel) &&
+    partner_constancy.includes(d.partner_constancy)
+  )
+}
+```

@@ -1,0 +1,79 @@
+```{ojs}
+//| output: false
+// Both plots below pivot a handful of per_game_summary's wide fraction
+// columns into a single long (type, value) column pair, then treat the
+// former column name as a grouping/facet variable — mirrors app.R's
+// `pivot_longer(...)` calls in its def_plot/pos_plot/pos_stack_plot.
+npLongRows = meltRows(
+  filtered,
+  ["bare", "definite", "indefinite", "quantifier", "proper_noun", "demonstrative", "possessive"],
+  "np_type", "np_count"
+)
+posLongRows = meltRows(
+  filtered,
+  ["NOUN", "VERB", "DET", "PRON", "MODIFIER", "FUNCTION"],
+  "pos_type", "pos_frac"
+)
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.n_hedges)), {
+  y: "n_hedges",
+  title: "Hedges across repetitions",
+  yLabel: "Hedges per trial",
+  ylim: [0, 5],
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+// Always colored by NP type — overrides the sidebar's own "Color by" choice,
+// same as app.R's def_plot (which hardcodes `grouping = "np_type"`). Faceting
+// still respects the sidebar's normal "Facet by" choice.
+linePlot(npLongRows.filter(d => Number.isFinite(d.np_count)), {
+  y: "np_count",
+  title: "Fraction of different types of NPs",
+  yLabel: "Fraction of NPs",
+  ylim: [0, 1],
+  groupingVar: "np_type",
+  groupLabel: "NP type",
+  facetVar: faceting,
+  indivLines: false,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+// Always faceted by part of speech — overrides the sidebar's own "Facet by"
+// choice, same as app.R's pos_plot (which hardcodes `faceting = "pos_type"`).
+// Coloring still respects the sidebar's normal "Color by" choice.
+linePlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
+  y: "pos_frac",
+  title: "Part of speech rate",
+  yLabel: "Part of speech fraction",
+  ylim: [0, 1],
+  groupingVar: grouping,
+  facetVar: "pos_type",
+  facetLabel: "Part of speech",
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+stackPlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
+  y: "pos_frac",
+  title: "Part of speech fraction",
+  yLabel: "Part of speech fraction",
+  groupingVar: "pos_type",
+  groupLabel: "Part of speech",
+  facetVar: faceting,
+  containerWidth: mainWidth
+})
+```

@@ -113,7 +113,7 @@ parsed <- get_parsed_messages()
 annotated <- get_annotated_messages()
 ```
 
-See [refbankr github repository](https://github.com/refbank/refbankr) for more information.
+<!-- See [refbankr github repository](https://github.com/refbank/refbankr) for more information. -->
 
 ## Python
 

@@ -17,3 +17,176 @@ iframe { border: none; }
 }
 
 .figure-caption { text-align: center; }
+
+.viz-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.viz-sidebar {
+  flex: 0 0 320px;
+  max-width: 320px;
+}
+.viz-main {
+  flex: 1 1 480px;
+  min-width: 0;
+}
+
+// Quarto's own bootstrap CSS (`.panel-input > div, .panel-input > div > div`)
+// reserves a 12px right-side gutter — two levels deep — on panel-input cells,
+// meant for a floating "copy code" button. Every filter cell here renders
+// with echo:false (no visible source), so that button never appears and the
+// gutter just makes the sidebar's right margin look wider than its left.
+// Zero it out at both levels (plus the code scaffold, which gets it too).
+.viz-sidebar .code-copy-outer-scaffold,
+.viz-sidebar .cell-output-display,
+.viz-sidebar .cell-output-display > div {
+  padding-right: 0;
+}
+
+// Shiny-style filter controls: bold label on its own line, control full-width
+// underneath — rather than Observable Inputs' default label-left/control-right
+// row, which left too little width for checkbox lists and long dataset names.
+//
+// Checkbox groups carry an extra Observable-provided class (currently
+// "oi-<hash>-checkbox") with its own `display:flex` rule that outranks a plain
+// ".viz-sidebar form" selector on specificity, so plain `form` alone isn't
+// enough — `[class*="-checkbox"]` matches that class by substring (stable
+// across hash changes) and adds the specificity needed to win.
+.viz-sidebar form,
+.viz-sidebar form[class*="-checkbox"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+  margin-bottom: 0.5rem;
+  max-width: 100%;
+}
+// Dropdowns need more breathing room after them than checkboxes/sliders do.
+.viz-sidebar form:has(select) {
+  margin-bottom: 0.875rem;
+}
+.viz-sidebar form > label,
+.viz-sidebar form[class*="-checkbox"] > label {
+  font-weight: 700;
+  order: -1;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.viz-sidebar form > div,
+.viz-sidebar form[class*="-checkbox"] > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  max-width: 100%;
+  min-width: 0;
+}
+// The dataset list (~20 items) reads better one-per-row than wrapped into a
+// multi-column grid — unlike the short checkbox groups (age, modality, ...)
+// this rule intentionally doesn't apply to. `:not(.viz-select-buttons)`
+// excludes the select-all/select-none button row, which should stay as a
+// normal side-by-side pair rather than also being stacked by this rule.
+.viz-sidebar form.viz-dataset-checkboxes > div:not(.viz-select-buttons) {
+  flex-direction: column;
+}
+
+// Inputs.toggle is a single-line control (label + one checkbox, both direct
+// children of form) — it shouldn't get the stacked label-above-control
+// treatment, or the checkbox drops to its own line beneath the label.
+.viz-sidebar form[class*="-toggle"] {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+.viz-sidebar form[class*="-toggle"] > label {
+  width: auto;
+  order: 0;
+}
+
+// Quarto wraps every OJS declaration in a `.cell-output-display` box with
+// `overflow-x: auto`; the range-input pair (number box + track) is wider than
+// the sidebar column, so each slider got its own tiny horizontal scrollbar.
+// Let the inputs shrink to fit instead of scrolling.
+.viz-sidebar .cell-output-display {
+  overflow-x: visible;
+}
+// One layer down, Quarto/Observable wraps the actual form in an unlabeled
+// `display: inline-block` div, which shrink-to-fits its content (e.g. a
+// <select>'s widest option, "Information availability") instead of stretching
+// to the sidebar's width — that's what let selects render wider than the
+// sidebar and poke out past its edge.
+.viz-sidebar .cell-output-display > div {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+// Inputs.select defaults to a width sized off its widest option text, which
+// overflowed the 320px sidebar (e.g. "Information availability").
+.viz-sidebar select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+// Two-handle range slider, ported from levante-datapage's _interval.qmd
+// (observablehq.com/@mootari/range-slider) rather than reinventing one.
+// `.viz-sidebar form > div` (above) turns this into a flex container too;
+// force it back to a plain block so it fills the available width normally.
+.viz-sidebar form > div.viz-range-slider {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.2rem 0 0.3rem;
+  padding: 0 0.4rem;
+}
+// The component's own outer div grows to a fixed 360px above its 30em
+// breakpoint — a *viewport* width, not our ~320px sidebar column's actual
+// rendered width — so force it back to fill the sidebar instead of
+// overflowing it.
+.viz-sidebar .viz-range-slider > div {
+  width: 100% !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+// The component injects its own scoped <style> tag (equal specificity to
+// ours) later in the DOM than this compiled theme CSS, so equal-specificity
+// selectors lose to it on source order. Chaining through
+// `.viz-sidebar .viz-range-slider` raises our specificity above its own
+// single-class `.range-slider`/`.thumb`/etc. rules so ours reliably wins.
+// `.range-slider`/`.range-track`/`.thumb` are the component's own stable
+// classnames (only its outermost wrapper div uses a randomly generated one
+// per instance, which these rules don't need to reference).
+.viz-sidebar .viz-range-slider .range-slider {
+  --thumb-size: 12px;
+}
+.viz-sidebar .viz-range-slider .range-track {
+  height: 4px;
+  background-color: #d8d8d8;
+}
+.viz-sidebar .viz-range-slider .thumb {
+  background: #0d6efd;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+// The current-range readout the component prints below the track.
+.viz-sidebar .viz-range-slider output {
+  font-size: 0.7rem;
+  color: var(--bs-body-color);
+}
+
+.viz-select-btn {
+  background: transparent;
+  border: 1px solid #6c757d;
+  color: var(--bs-body-color);
+  font-weight: 400;
+  font-size: 0.75rem;
+  padding: 0.05rem 0.5rem;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.viz-select-btn:hover {
+  background: var(--bs-tertiary-bg, #f0f0f0);
+}

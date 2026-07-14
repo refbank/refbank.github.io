@@ -1,0 +1,51 @@
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.to_next)), {
+  y: "to_next",
+  title: "Convergence: Similarity to previous round utterance within game",
+  yLabel: "Cosine similarity",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.diverge)), {
+  y: "diverge",
+  title: "Divergence: Similarity to other games within rounds",
+  yLabel: "Cosine similarity",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.diff)), {
+  y: "diff",
+  title: "Differentiation: Similarity to other same-round targets within game",
+  yLabel: "Cosine similarity",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```
+
+```{ojs}
+linePlot(filtered.filter(d => Number.isFinite(d.idiosyncrasy)), {
+  y: "idiosyncrasy",
+  title: "Idiosyncrasy: Similarity to mean of round 1 utterances",
+  yLabel: "Cosine similarity",
+  groupingVar: grouping,
+  facetVar: faceting,
+  indivLines: indiv_lines,
+  stageOneOnly: stage_one_only,
+  containerWidth: mainWidth
+})
+```

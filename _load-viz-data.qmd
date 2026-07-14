@@ -1,0 +1,7 @@
+```{r}
+dataset <- redivis::organization("datapages")$dataset("refbank")
+game_summary <- dataset$table("per_game_summary")$to_tibble() |>
+  dplyr::filter(confederates == "no")
+
+ojs_define(game_summary = game_summary)
+```
