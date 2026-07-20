@@ -601,6 +601,29 @@ function facetWrap(rows, col, ncol) {
 
 ```{ojs}
 //| output: false
+// d3's log-scale ticks(count) only thins ticks down to `count` when the domain
+// spans *more* decades than `count` — when it spans fewer (the common case
+// here: these plots rarely cross more than 2-3 decades), it ignores `count`
+// entirely and lists every 1-9 mantissa in each decade, which is exactly the
+// crowding we're trying to avoid. Building the tick array by hand — the
+// classic 1/2/5-per-decade log-plot sequence, clipped to the visible range —
+// sidesteps that d3 behavior instead of fighting it.
+function logTicks(lo, hi) {
+  if (!(lo > 0) || !(hi > lo)) return undefined
+  const kLo = Math.floor(Math.log10(lo)), kHi = Math.ceil(Math.log10(hi))
+  const candidates = []
+  for (let k = kLo; k <= kHi; k++) {
+    for (const m of [1, 2, 5]) {
+      const t = m * 10 ** k
+      if (t >= lo && t <= hi) candidates.push(t)
+    }
+  }
+  return candidates.length ? candidates : undefined
+}
+```
+
+```{ojs}
+//| output: false
 // Mirrors app.R's make_line_plot: groupingVar === "dataset_id" is the "no explicit
 // grouping" sentinel — points still colored by dataset, but the legend is hidden and
 // a single aggregate trend (with CI ribbon) is drawn instead of one trend per color
@@ -684,6 +707,8 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
     ? (logY ? [d3.min(plotRows, d => d[y]), ylim[1]] : ylim)
     : undefined
   const yFloor = logY ? (yDomain ? yDomain[0] : d3.min(plotRows, d => d[y])) : null
+  const yCeil = logY ? (yDomain ? yDomain[1] : d3.max(plotRows, d => d[y])) : null
+  const yTicks = logY ? logTicks(yFloor, yCeil) : undefined
 
   const marks = []
 
@@ -772,8 +797,10 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
     // Plot's default log-scale tick format uses SI-prefix notation (e.g. "100m"
     // for 0.1, "m" meaning milli) — accurate but reads as "100 million" at a
     // glance for small fractional counts like hedges-per-trial. Plain decimal
-    // formatting avoids the ambiguity on both log and linear y-axes.
-    y: { label: logY ? `${yLabel} (log scale)` : yLabel, domain: yDomain, type: logY ? "log" : undefined, tickFormat: d3.format(",~g") },
+    // formatting avoids the ambiguity on both log and linear y-axes. `yTicks`
+    // (see logTicks above) replaces d3's own log-scale tick choice, which
+    // crowds and overlaps once labels are this wide.
+    y: { label: logY ? `${yLabel} (log scale)` : yLabel, domain: yDomain, type: logY ? "log" : undefined, tickFormat: d3.format(",~g"), ticks: yTicks },
     fx: isFaceted ? { padding: 0.1 } : undefined,
     fy: isFaceted ? { padding: 0.15 } : undefined,
     color: { ...spec, legend: false },
