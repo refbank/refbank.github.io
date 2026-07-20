@@ -499,14 +499,53 @@ function weightedLogTrend(rows, { x, y, weight }) {
   }
 }
 
+// Weighted least squares fit of log(y) ~ log(x), weighted by `weight` — a
+// power-law fit (y = exp(a) * x^b), used for measures like utterance length
+// and response time that reduce proportionally across repetitions rather than
+// by a fixed amount per log-step. Returns a predict(x) => {y, lo, hi} function
+// (95% CI band, transformed back out of log-y space), or null if there isn't
+// enough data to fit (fewer than 3 valid points, or zero x-variance). Rows
+// with y <= 0 can't sit in log-y space and are dropped from the fit.
+function weightedLogLogTrend(rows, { x, y, weight }) {
+  const pts = rows
+    .map(r => ({ xt: Math.log(r[x]), yt: Math.log(r[y]), w: r[weight] }))
+    .filter(p => Number.isFinite(p.xt) && Number.isFinite(p.yt) && Number.isFinite(p.w) && p.w > 0)
+
+  const n = pts.length
+  if (n < 3) return null
+
+  const W = d3.sum(pts, p => p.w)
+  const xtbar = d3.sum(pts, p => p.w * p.xt) / W
+  const ytbar = d3.sum(pts, p => p.w * p.yt) / W
+  const Sxy = d3.sum(pts, p => p.w * (p.xt - xtbar) * (p.yt - ytbar))
+  const Sxx = d3.sum(pts, p => p.w * (p.xt - xtbar) ** 2)
+  if (Sxx === 0) return null
+
+  const slope = Sxy / Sxx
+  const intercept = ytbar - slope * xtbar
+  const df = n - 2
+  const residSS = d3.sum(pts, p => p.w * (p.yt - (intercept + slope * p.xt)) ** 2)
+  const sigma2 = residSS / df
+  const tcrit = jStat.studentt.inv(0.975, df)
+
+  return function predict(xVal) {
+    const xt = Math.log(xVal)
+    const ythat = intercept + slope * xt
+    const se = Math.sqrt(sigma2 * (1 / W + ((xt - xtbar) ** 2) / Sxx))
+    return { y: Math.exp(ythat), lo: Math.exp(ythat - tcrit * se), hi: Math.exp(ythat + tcrit * se) }
+  }
+}
+
 // Adds a trend line (and, if withCI, a ribbon) fit to `rows` onto `marks`, spanning
-// the observed x-range of those rows. No-ops if weightedLogTrend can't fit a line.
+// the observed x-range of those rows. No-ops if the fit function can't fit a line.
 // `facet`, if given, is a constant `{fx, fy}` identifying which facet panel this
 // trend belongs to — stamped onto every synthetic point of the fitted curve (real
 // data rows carry their own fx/fy via a row accessor; these synthetic ones don't,
 // so the value has to be attached directly) and passed to each mark as `fx: "fx"`.
-function addTrend(marks, rows, { x, y, weight }, color, withCI, facet) {
-  const predict = weightedLogTrend(rows, { x, y, weight })
+// `fitTrend` selects the regression model — defaults to y ~ log(x); pass
+// weightedLogLogTrend for a log(y) ~ log(x) power-law fit instead.
+function addTrend(marks, rows, { x, y, weight }, color, withCI, facet, yFloor, fitTrend = weightedLogTrend) {
+  const predict = fitTrend(rows, { x, y, weight })
   if (!predict) return
 
   const xs = rows.map(d => d[x]).filter(v => v > 0)
@@ -514,7 +553,15 @@ function addTrend(marks, rows, { x, y, weight }, color, withCI, facet) {
   if (xMin == null || xMax == null || xMin === xMax) return
 
   const grid = d3.range(0, 51).map(i => xMin + (i / 50) * (xMax - xMin))
-  const predicted = grid.map(xVal => ({ x: xVal, ...predict(xVal), ...facet }))
+  // The fit itself is linear in y (weightedLogTrend only logs x), so its CI
+  // can dip to or below 0 wherever uncertainty is high — invalid on a log
+  // y-axis. Clamp to the plot's own y-floor (undefined/null when the axis is
+  // linear, a no-op) rather than letting a sub-zero point silently vanish.
+  const clampFloor = v => yFloor != null ? Math.max(v, yFloor) : v
+  const predicted = grid.map(xVal => {
+    const { y: yHat, lo, hi } = predict(xVal)
+    return { x: xVal, y: clampFloor(yHat), lo: clampFloor(lo), hi: clampFloor(hi), ...facet }
+  })
   const facetChannels = facet ? { fx: "fx", fy: "fy" } : {}
 
   if (withCI) {
@@ -564,11 +611,15 @@ function facetWrap(rows, col, ncol) {
 // offer (e.g. the PoS tab always colors its NP-type plot by `np_type` and always
 // facets its POS-fraction plot by `pos_type`, regardless of the sidebar's own
 // selections for those).
-function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, indivLines, stageOneOnly, containerWidth, groupLabel, facetLabel }) {
+function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, indivLines, stageOneOnly, containerWidth, groupLabel, facetLabel, logX = false, logY = false, logLogTrend = false }) {
   const xVar = "rep_num", weight = "trials"
+  // Rows with y <= 0 can't sit on a log y-scale — drop them up front so every
+  // downstream step (marks, trend fits, facet/tick extents) agrees on what's
+  // actually being plotted, rather than only filtering at the mark stage.
+  const plotRows = logY ? rows.filter(d => d[y] > 0) : rows
   const isDefaultGrouping = groupingVar === "dataset_id"
   const isFaceted = facetVar !== "dataset_id"
-  const spec = colorSpec(rows, groupingVar)
+  const spec = colorSpec(plotRows, groupingVar)
   const showLegend = !isDefaultGrouping
 
   const MAX_PLOT_WIDTH = 900, MIN_PANEL_WIDTH = 220
@@ -586,9 +637,9 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   // divisor.
   let facetKeys = null, fxOf = null, fyOf = null, ncol = 1, nrow = 1
   if (isFaceted) {
-    const n = Array.from(d3.union(rows.map(d => d[facetVar]))).length
+    const n = Array.from(d3.union(plotRows.map(d => d[facetVar]))).length
     ncol = Math.max(1, Math.min(n, Math.floor(plotWidth / MIN_PANEL_WIDTH)))
-    ;({ keys: facetKeys, fxOf, fyOf } = facetWrap(rows, facetVar, ncol))
+    ;({ keys: facetKeys, fxOf, fyOf } = facetWrap(plotRows, facetVar, ncol))
     nrow = Math.ceil(facetKeys.length / ncol)
   }
   const panelWidth = isFaceted ? Math.floor(plotWidth / ncol) : plotWidth
@@ -616,7 +667,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   // faceting Plot still tries to place all of them, projecting the
   // out-of-domain ones past the frame edge and into the next panel's space.
   // Filtering to the observed extent up front sidesteps that entirely.
-  const xExtent = d3.extent(rows, d => d[xVar])
+  const xExtent = d3.extent(plotRows, d => d[xVar])
   const xTicks = d3.range(1, 14).filter(t => t >= xExtent[0] && t <= xExtent[1])
 
   // Winsorize the plotted y-value to the declared ylim: without a fixed
@@ -624,6 +675,15 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   // into the axis-label area. Only the drawn marks are capped — the trend
   // fits below still use the true, uncapped values.
   const yValue = ylim ? (d => Math.min(ylim[1], Math.max(ylim[0], d[y]))) : (d => d[y])
+
+  // ylim's lower bound (0, for counts like word/hedge totals) isn't a valid
+  // log-scale floor — log(0) is undefined — so on a log y-axis the floor
+  // comes from the actual data minimum (already > 0 thanks to plotRows)
+  // instead. The winsorizing upper bound is unaffected either way.
+  const yDomain = ylim
+    ? (logY ? [d3.min(plotRows, d => d[y]), ylim[1]] : ylim)
+    : undefined
+  const yFloor = logY ? (yDomain ? yDomain[0] : d3.min(plotRows, d => d[y])) : null
 
   const marks = []
 
@@ -643,14 +703,15 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   }
 
   if (indivLines) {
-    marks.push(Plot.line(rows, { x: xVar, y: yValue, z: "game_id", stroke: colorChannel, strokeOpacity: 0.05, ...facetChannels }))
+    marks.push(Plot.line(plotRows, { x: xVar, y: yValue, z: "game_id", stroke: colorChannel, strokeOpacity: 0.05, ...facetChannels }))
   }
-  marks.push(Plot.dot(rows, { x: xVar, y: yValue, fill: colorChannel, fillOpacity: 0.3, stroke: null, r: 2.5, ...facetChannels }))
+  marks.push(Plot.dot(plotRows, { x: xVar, y: yValue, fill: colorChannel, fillOpacity: 0.3, stroke: null, r: 2.5, ...facetChannels }))
 
   // Trend lines are fit once per (facet panel × color level × stage) combination —
   // faceting and coloring both narrow the rows a trend is fit to, independent of
   // each other.
-  const facetTargets = isFaceted ? d3.groups(rows, d => d[facetVar]) : [[null, rows]]
+  const facetTargets = isFaceted ? d3.groups(plotRows, d => d[facetVar]) : [[null, plotRows]]
+  const fitTrend = logLogTrend ? weightedLogLogTrend : weightedLogTrend
   for (const [facetKey, facetRows] of facetTargets) {
     const facetTag = isFaceted ? { fx: fxOf(facetKey), fy: fyOf(facetKey) } : undefined
     if (isDefaultGrouping) {
@@ -658,7 +719,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
         ? [facetRows]
         : d3.groups(facetRows, d => d.stage_num).map(([, rs]) => rs)
       for (const trendRows of trendGroups) {
-        addTrend(marks, trendRows, { x: xVar, y, weight }, "black", true, facetTag)
+        addTrend(marks, trendRows, { x: xVar, y, weight }, "black", true, facetTag, yFloor, fitTrend)
       }
     } else {
       for (const [level, levelRows] of d3.groups(facetRows, d => d[groupingVar])) {
@@ -667,7 +728,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
           ? [levelRows]
           : d3.groups(levelRows, d => d.stage_num).map(([, rs]) => rs)
         for (const trendRows of trendGroups) {
-          addTrend(marks, trendRows, { x: xVar, y, weight }, color, false, facetTag)
+          addTrend(marks, trendRows, { x: xVar, y, weight }, color, false, facetTag, yFloor, fitTrend)
         }
       }
     }
@@ -702,8 +763,17 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
     // tick, on the same baseline as the tick numbers, which collided with the
     // "6" tick once the axis font size grew. A caption below the plot (added
     // by hand, see `xCaption`) avoids that entirely.
-    x: { ticks: xTicks, tickFormat: "d", label: null },
-    y: { label: yLabel, domain: ylim ?? undefined },
+    // `type: "log"` only changes tick *spacing*, not what's printed — Plot
+    // still labels ticks with the real values (1, 2, 5, 10, ...) via
+    // tickFormat, not log(value). The trend fit (weightedLogTrend) is already
+    // y ~ log(x), so a log x-axis is also what makes that curve render as a
+    // straight line instead of the bend it has on a linear x-axis.
+    x: { ticks: xTicks, tickFormat: "d", label: null, type: logX ? "log" : undefined },
+    // Plot's default log-scale tick format uses SI-prefix notation (e.g. "100m"
+    // for 0.1, "m" meaning milli) — accurate but reads as "100 million" at a
+    // glance for small fractional counts like hedges-per-trial. Plain decimal
+    // formatting avoids the ambiguity on both log and linear y-axes.
+    y: { label: logY ? `${yLabel} (log scale)` : yLabel, domain: yDomain, type: logY ? "log" : undefined, tickFormat: d3.format(",~g") },
     fx: isFaceted ? { padding: 0.1 } : undefined,
     fy: isFaceted ? { padding: 0.15 } : undefined,
     color: { ...spec, legend: false },
@@ -726,7 +796,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
   const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
   const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
-  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition →</div>`
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition${logX ? " (log scale)" : ""} →</div>`
 
   if (!showLegend) return html`<div>${heading}${plot}${xCaption}</div>`
 
@@ -772,7 +842,7 @@ function meltRows(rows, columns, keyName, valueName) {
 // by). Shares linePlot's facet-grid sizing/labeling/caption/legend chrome;
 // the only real difference is the mark itself (Plot.stackY'd areas instead of
 // dots + trend lines).
-function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWidth, groupLabel, facetLabel }) {
+function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWidth, groupLabel, facetLabel, logX = false }) {
   const xVar = "rep_num"
   const isFaceted = facetVar !== "dataset_id"
   const spec = colorSpec(rows, groupingVar)
@@ -852,7 +922,7 @@ function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWid
     marginRight: PLOT_MARGIN_RIGHT,
     marginTop: 35,
     grid: true,
-    x: { ticks: xTicks, tickFormat: "d", label: null },
+    x: { ticks: xTicks, tickFormat: "d", label: null, type: logX ? "log" : undefined },
     y: { label: yLabel, domain: [0, 1] },
     fx: isFaceted ? { padding: 0.1 } : undefined,
     fy: isFaceted ? { padding: 0.15 } : undefined,
@@ -865,7 +935,7 @@ function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWid
   const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
   const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
   const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
-  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition →</div>`
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition${logX ? " (log scale)" : ""} →</div>`
 
   const legendTitle = groupLabel ?? Array.from(groupingOpts).find(([, key]) => key === groupingVar)?.[0] ?? groupingVar
   const legendEl = html`<div style="margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1rem;">

@@ -34,13 +34,21 @@ viewof population = Inputs.checkbox(population_choices, { value: population_choi
 viewof modality = Inputs.checkbox(modality_choices, { value: modality_choices, label: "Modality" })
 viewof feedback = Inputs.checkbox(["none", "limited", "full"], { value: ["none", "limited", "full"], label: "Feedback on selection accuracy" })
 viewof backchannel = Inputs.checkbox(["none", "limited", "full"], { value: ["none", "limited", "full"], label: "Matcher backchannel" })
-viewof partner_constancy = Inputs.checkbox(new Map([["Swaps", "no"], ["No swaps", "yes"]]), { value: ["no", "yes"], label: "Partner constancy" })
+viewof partner_constancy = Inputs.checkbox(new Map([["swaps", "no"], ["no swaps", "yes"]]), { value: ["no", "yes"], label: "Partner constancy" })
 
 viewof grouping = Inputs.select(groupingOpts, { value: "dataset_id", label: "Color by" })
 viewof faceting = Inputs.select(facetingOpts, { value: "dataset_id", label: "Facet by" })
 
 viewof indiv_lines = Inputs.toggle({ value: true, label: "Show lines per game" })
 viewof stage_one_only = Inputs.toggle({ value: true, label: "Only include first stage data" })
+
+// Log-y is only wired into plots whose y is an unbounded, always-positive
+// count/rate (words, hedges, response time) — where a multiplicative/log
+// scale is the standard choice. It's a no-op everywhere else: proportions
+// (accuracy, POS/NP fractions) are bounded and can hit 0/1, and cosine
+// similarities (embedding tab) can go negative — neither suits a log scale.
+viewof log_rep_axis = Inputs.toggle({ value: false, label: "Log x-axis (repetition)" })
+viewof log_y_axis = Inputs.toggle({ value: false, label: "Log y-axis (count-based plots)" })
 
 // Select-all/none buttons sit in their own row right after the "Dataset" label
 // (and before the checkbox list) — a sibling, not appended into the label, so
@@ -49,7 +57,7 @@ viewof stage_one_only = Inputs.toggle({ value: true, label: "Only include first 
 // untouched since we only insert a sibling, not wrap the form itself.
 viewof dataset = {
   const checkboxInput = Inputs.checkbox(dataset_choices, {
-    value: dataset_choices.filter(d => d !== "yoon2019_audience"),
+    value: dataset_choices,
     label: "Datasets"
   });
   // Marker class so theme.scss can force one-dataset-per-row on this

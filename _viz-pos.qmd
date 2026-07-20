@@ -26,7 +26,10 @@ linePlot(filtered.filter(d => Number.isFinite(d.n_hedges)), {
   facetVar: faceting,
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis,
+  logY: log_y_axis,
+  logLogTrend: true
 })
 ```
 
@@ -44,7 +47,8 @@ linePlot(npLongRows.filter(d => Number.isFinite(d.np_count)), {
   facetVar: faceting,
   indivLines: false,
   stageOneOnly: stage_one_only,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis
 })
 ```
 
@@ -62,7 +66,8 @@ linePlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
   facetLabel: "Part of speech",
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis
 })
 ```
 
@@ -74,6 +79,7 @@ stackPlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
   groupingVar: "pos_type",
   groupLabel: "Part of speech",
   facetVar: faceting,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis
 })
 ```

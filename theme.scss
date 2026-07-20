@@ -11,6 +11,14 @@ $primary: #D2B48C;
 
 iframe { border: none; }
 
+// OJS prints a red error block into the page for any reactive cell that
+// throws (e.g. transiently, while an upstream input is still updating) —
+// ported from levante-datapage, which hides these rather than showing
+// noise to the reader.
+.observablehq--error {
+  display: none;
+}
+
 #title-block-header a {
   color: rgba(var(--bs-link-color-rgb), var(--bs-link-opacity, 1));
   text-decoration: underline;

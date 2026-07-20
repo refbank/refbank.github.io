@@ -10,7 +10,10 @@
     facetVar: faceting,
     indivLines: indiv_lines,
     stageOneOnly: stage_one_only,
-    containerWidth: mainWidth
+    containerWidth: mainWidth,
+    logX: log_rep_axis,
+    logY: log_y_axis,
+    logLogTrend: true
   })
 }
 ```
@@ -24,7 +27,8 @@ linePlot(filtered.filter(d => Number.isFinite(d.accuracy)), {
   facetVar: faceting,
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis
 })
 ```
 
@@ -37,6 +41,9 @@ linePlot(filtered.filter(d => Number.isFinite(d.rt)), {
   facetVar: faceting,
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
-  containerWidth: mainWidth
+  containerWidth: mainWidth,
+  logX: log_rep_axis,
+  logY: log_y_axis,
+  logLogTrend: true
 })
 ```
