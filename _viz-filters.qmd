@@ -4,7 +4,7 @@
 // Choice sets are derived from the data, mirroring app.R's `sort(unique(df$...))`.
 // feedback/backchannel use the same fixed 3-level scale app.R hardcodes.
 group_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.group_size)))).sort((a, b) => a - b)
-option_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.option_size)))).sort((a, b) => a - b)
+option_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.option_set_size)))).sort((a, b) => a - b)
 rep_choices = d3.range(1, 14)
 population_choices = Array.from(new Set(game_summary_rows.map(d => d.population))).sort()
 modality_choices = Array.from(new Set(game_summary_rows.map(d => d.modality))).sort()
@@ -14,7 +14,7 @@ groupingOpts = new Map([
   ["Dataset", "dataset_id"],
   ["Group size", "group_size"],
   ["Information availability", "information_availability_composite"],
-  ["Option set size", "option_size"],
+  ["Option set size", "option_set_size"],
   ["Modality", "modality"],
   ["Backchannel", "backchannel"],
   ["Feedback", "feedback"],
@@ -89,9 +89,9 @@ filtered = {
   return game_summary_rows.filter(d =>
     (!stage_one_only || d.stage_num === 1) &&
     dataset.includes(d.dataset_id) &&
-    repLo <= d.rep_num && d.rep_num <= repHi &&
+    repLo <= d.round_num && d.round_num <= repHi &&
     groupSizeLo <= Number(d.group_size) && Number(d.group_size) <= groupSizeHi &&
-    optionSizeLo <= Number(d.option_size) && Number(d.option_size) <= optionSizeHi &&
+    optionSizeLo <= Number(d.option_set_size) && Number(d.option_set_size) <= optionSizeHi &&
     population.includes(d.population) &&
     modality.includes(d.modality) &&
     feedback.includes(d.feedback) &&

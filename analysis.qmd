@@ -30,8 +30,8 @@ conditions <- get_conditions()
 # trial-level information about who was in the trial, what the stimuli were, and when in a game it occurred
 trials <- get_trials()
 
-# information about participant choices on each trial
-choices <- get_choices()
+# information about participant selections on each trial
+selections <- get_selections()
 
 # language data for each trial
 messages <- get_messages()
@@ -80,7 +80,7 @@ messages <- get_messages(include_trial_data=T,
                          include_image_data=T,
                          include_condition_data=T)
                          
-choices <- get_choices(include_trial_data=T,
+selections <- get_selections(include_trial_data=T,
                        include_player_data=T,
                        include_image_data=T,
                        include_condition_data=T)

@@ -396,9 +396,9 @@ function rangeSlider(choices, { label, defaultRange } = {}) {
 
 ```{ojs}
 //| output: false
-// group_size and option_size are ordered numeric variables with an open-ended
+// group_size and option_set_size are ordered numeric variables with an open-ended
 // set of levels (new group/option sizes show up as datasets are added — e.g.
-// option_size gained 18 and 36 after this was first written) — a sequential
+// option_set_size gained 18 and 36 after this was first written) — a sequential
 // D3 interpolator scaled to whatever levels are actually present adapts
 // automatically, unlike a hardcoded value→color lookup that silently falls
 // back to flat grey for anything it wasn't updated to include.
@@ -407,7 +407,7 @@ function rangeSlider(choices, { label, defaultRange } = {}) {
 // OPT_SIZE_COL_SCALE) used.
 orderedColorScales = ({
   group_size: { interpolator: d3.interpolateViridis, reverse: true },
-  option_size: { interpolator: d3.interpolateMagma, reverse: true }
+  option_set_size: { interpolator: d3.interpolateMagma, reverse: true }
 })
 
 // information_availability_composite isn't a smooth quantity in the same way
@@ -435,7 +435,7 @@ fixedOrders = ({
 function colorSpec(rows, groupingVar) {
   const rawLevels = Array.from(new Set(rows.map(d => d[groupingVar])))
   const fixedOrder = fixedOrders[groupingVar]
-  // Sort numerically when every level parses as a number (group_size, option_size,
+  // Sort numerically when every level parses as a number (group_size, option_set_size,
   // information_availability_composite, ...) so the legend/facet order is 2, 4, 6, ...
   // rather than the lexicographic "10, 12, ..., 2, 4, ..." a plain string sort gives.
   const allNumeric = rawLevels.every(v => Number.isFinite(Number(v)))
@@ -635,7 +635,7 @@ function logTicks(lo, hi) {
 // facets its POS-fraction plot by `pos_type`, regardless of the sidebar's own
 // selections for those).
 function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, indivLines, stageOneOnly, containerWidth, groupLabel, facetLabel, logX = false, logY = false, logLogTrend = false }) {
-  const xVar = "rep_num", weight = "trials"
+  const xVar = "round_num", weight = "trials"
   // Rows with y <= 0 can't sit on a log y-scale — drop them up front so every
   // downstream step (marks, trend fits, facet/tick extents) agrees on what's
   // actually being plotted, rather than only filtering at the mark stage.
@@ -681,7 +681,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
     panelWidth / (isFaceted ? ASPECT_FACETED : ASPECT_SINGLE))))
 
   // Color domains are strings (see colorSpec), so the channel must coerce too —
-  // otherwise numeric columns like group_size/option_size won't match the domain.
+  // otherwise numeric columns like group_size/option_set_size won't match the domain.
   const colorChannel = d => String(d[groupingVar])
 
   // Ticks beyond the data's actual x-extent (e.g. the Repetition filter
@@ -870,7 +870,7 @@ function meltRows(rows, columns, keyName, valueName) {
 // the only real difference is the mark itself (Plot.stackY'd areas instead of
 // dots + trend lines).
 function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWidth, groupLabel, facetLabel, logX = false }) {
-  const xVar = "rep_num"
+  const xVar = "round_num"
   const isFaceted = facetVar !== "dataset_id"
   const spec = colorSpec(rows, groupingVar)
 
