@@ -619,14 +619,14 @@
     },
     "redivis": {
       "Package": "redivis",
-      "Version": "0.12.11",
+      "Version": "0.12.12",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "redivis",
       "RemoteRepo": "redivis-r",
       "RemoteRef": "main",
-      "RemoteSha": "8e6c3b8e523df539d741c76f2aaeb2fccfc78334",
+      "RemoteSha": "3e060333faca9ee39618dd706c99dcf1a32175a7",
       "Requirements": [
         "DBI",
         "R",
@@ -649,7 +649,27 @@
         "tibble",
         "uuid"
       ],
-      "Hash": "7caff15a056bca4ad96a1848c92e940c"
+      "Hash": "0e2af8f4f92d72fbfe02eef0e3e60aa5"
+    },
+    "refbankr": {
+      "Package": "refbankr",
+      "Version": "0.0.0.1000",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "refbank",
+      "RemoteRepo": "refbankr",
+      "RemoteRef": "main",
+      "RemoteSha": "5e150ab91586fa724c2d37f4976edce32e926e7b",
+      "Remotes": "redivis=redivis/redivis-r",
+      "Requirements": [
+        "dplyr",
+        "glue",
+        "redivis",
+        "stringr",
+        "tidyr"
+      ],
+      "Hash": "da672ae55c4b8ec3609e0961f13f2080"
     },
     "renv": {
       "Package": "renv",
