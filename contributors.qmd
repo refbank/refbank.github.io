@@ -1,1 +1,235 @@
-{{< redivis-table datapages.refbank.datasets >}} 
+---
+title: "Datasets"
+---
+
+{{< redivis-table datapages.refbank.datasets >}}
+
+## Individual datasets
+
+Pick a dataset below to see plots and summary stats to compare against the original paper and more information about the dataset and its import process. 
+This has data with the original exclusions applied as closely as we could; small discrepancies are common when the data or exclusions are not exact. The readme below has notes on
+known discrepancies and notes on processing decisions.
+
+```{r}
+library(refbankr)
+library(dplyr)
+library(purrr)
+
+trials <- get_trials()
+selections <- get_selections()
+messages <- get_messages()
+conditions <- get_conditions()
+
+dataset_ids <- sort(unique(trials$dataset_id))
+
+checks_by_dataset <- purrr::map(dataset_ids, function(id) {
+  checks <- refbankr::summarize_dataset_checks(
+    trials = filter(trials, dataset_id == id),
+    selections = filter(selections, dataset_id == id),
+    messages = filter(messages, dataset_id == id),
+    conditions = filter(conditions, dataset_id == id)
+  )
+  purrr::map(checks, \(tbl) mutate(tbl, dataset_id = id, .before = 1))
+})
+
+condition_summary <- purrr::map(checks_by_dataset, "summary_stats") |>
+  bind_rows() |>
+  select(
+    dataset_id, condition_label, group_size, population,
+    partner_constancy, role_constancy,
+    modality, feedback, backchannel, language,
+    n_games, total_trials,
+    mean_players, min_players, max_players,
+    mean_rounds, min_rounds, max_rounds,
+    mean_trials, min_trials, max_trials,
+    n_images_total, min_option_set_size, max_option_set_size,
+    n_trials_with_selections, n_trials_with_messages
+  )
+
+# round-level mean per dataset/condition/stage, for plotting -- stage_num is
+# included so lines don't connect across a partner switch
+round_summary <- bind_rows(
+  purrr::map(checks_by_dataset, "accuracy_plot_data") |> bind_rows() |> mutate(metric = "accuracy"),
+  purrr::map(checks_by_dataset, "words_plot_data") |> bind_rows() |> mutate(metric = "words")
+) |>
+  filter(!is.na(value)) |>
+  group_by(dataset_id, metric, condition_label, stage_num, round_num) |>
+  summarize(mean_value = mean(value), .groups = "drop")
+
+ojs_define(condition_summary_data = condition_summary)
+ojs_define(round_summary_data = round_summary)
+```
+
+```{ojs}
+//| output: false
+condition_summary_rows = transpose(condition_summary_data)
+round_summary_rows = transpose(round_summary_data)
+dataset_choices = Array.from(new Set(condition_summary_rows.map(d => d.dataset_id))).sort()
+```
+
+```{ojs}
+//| panel: input
+// Placeholder first option so the page opens with nothing selected, rather
+// than silently defaulting to (and computing/fetching for) whichever
+// dataset happens to sort first.
+viewof selected_dataset = Inputs.select(["", ...dataset_choices], {
+  label: "Dataset",
+  format: d => d === "" ? "— choose a dataset —" : d,
+  value: ""
+})
+```
+
+```{ojs}
+//| output: false
+hasSelection = selected_dataset !== ""
+selected_condition_rows = condition_summary_rows.filter(d => d.dataset_id === selected_dataset)
+selected_round_rows = round_summary_rows.filter(d => d.dataset_id === selected_dataset)
+accuracy_rows = selected_round_rows.filter(d => d.metric === "accuracy")
+words_rows = selected_round_rows.filter(d => d.metric === "words")
+lineGroup = d => `${d.condition_label}-${d.stage_num}`
+```
+
+```{ojs}
+//| output: false
+// Styling matches data.qmd's linePlot (_viz-helpers.qmd): larger sans-serif
+// type, a bold heading pulled out of Plot's own (lighter) title, gridlines,
+// and heavier lines/dots. Unlike linePlot, ticks always label every round —
+// these plots are always a single dataset (not the cross-dataset comparison
+// linePlot handles), so the round range is small enough that showing every
+// integer, rather than a thinned default, is what makes the plot readable.
+function qaLinePlot(rows, { title, yLabel, yDomain }) {
+  const xExtent = d3.extent(rows, d => d.round_num)
+  const xTicks = d3.range(xExtent[0], xExtent[1] + 1)
+  // Explicit domain so the plot's color scale and the separately-built
+  // legend (below) are guaranteed to agree on which color goes with which
+  // condition -- both are handed the same domain array in the same order.
+  const colorDomain = Array.from(new Set(rows.map(d => d.condition_label))).sort()
+  const plot = Plot.plot({
+    style: { fontFamily: "var(--sans-serif)", fontSize: "1rem" },
+    width: 560,
+    height: 340,
+    marginLeft: 55,
+    marginTop: 20,
+    grid: true,
+    // No axis `label` here -- Plot's default draws "round" to the right of
+    // the last tick, on the same baseline as the tick numbers, which collides
+    // with the last round's label once every round gets its own tick. A
+    // caption below the plot (added by hand, see `caption`) avoids that.
+    x: { ticks: xTicks, tickFormat: "d", label: null },
+    y: { label: yLabel, domain: yDomain, tickFormat: d3.format(",~g") },
+    // Built-in legend is smaller than axis-label size and always sits above
+    // the plot -- turned off here in favor of a hand-placed Plot.legend()
+    // (below) so it can sit beside the plot at 1rem, matching the axis
+    // labels (mirrors linePlot's legend in _viz-helpers.qmd).
+    color: { domain: colorDomain, legend: false },
+    marks: [
+      Plot.ruleY([0]),
+      Plot.lineY(rows, { x: "round_num", y: "mean_value", stroke: "condition_label", z: lineGroup, strokeWidth: 2.5 }),
+      Plot.dot(rows, { x: "round_num", y: "mean_value", stroke: "condition_label", fill: "condition_label", r: 4 })
+    ]
+  })
+  // `label` is a no-op on swatches (categorical) legends -- add the title by hand.
+  // `columns: 1` + an explicit `width` stack the swatches one per row at a
+  // fixed narrow width -- left to its own default, the swatches legend
+  // expands to fill whatever space it's given, which (inside a flex row)
+  // ends up wider than the remaining space and wraps onto its own line
+  // below the plot instead of sitting beside it.
+  const legend = html`<div style="flex: 0 0 auto;">
+    <div style="font-weight: 600; font-size: 1rem; margin-bottom: 4px;">condition</div>
+    ${Plot.legend({ color: { domain: colorDomain }, style: { fontSize: "1rem" }, columns: 1, width: 180 })}
+  </div>`
+  const heading = html`<h3 style="font-size: 1.35rem; font-weight: 600; margin: 0 0 0.5rem;">${title}</h3>`
+  const caption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px;">round →</div>`
+  const plotBlock = html`<div style="flex: 0 0 auto;">${plot}${caption}</div>`
+  return html`<div>${heading}<div style="display: flex; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap;">${plotBlock}${legend}</div></div>`
+}
+```
+
+```{ojs}
+hasSelection
+  ? (accuracy_rows.length > 0
+      ? qaLinePlot(accuracy_rows, { title: "Accuracy by round", yLabel: "proportion correct", yDomain: [0, 1] })
+      : html`<p><em>Accuracy data not available for ${selected_dataset}.</em></p>`)
+  : html`<p><em>Choose a dataset above to see its plots.</em></p>`
+```
+
+```{ojs}
+hasSelection
+  ? (words_rows.length > 0
+      ? qaLinePlot(words_rows, { title: "Describer word count by round", yLabel: "# words" })
+      : html`<p><em>Message data not available for ${selected_dataset}.</em></p>`)
+  : html``
+```
+
+### Summary
+
+```{ojs}
+//| output: false
+// mean/min/max triples are shown as a single "mean (min–max)" figure when
+// they vary across games, or just the value when they don't (e.g. every
+// game had exactly 12 rounds) -- a caption below states the convention once
+// instead of repeating "mean"/"min"/"max" in every row label.
+fmt1 = x => typeof x === "number" ? Math.round(x * 10) / 10 : x
+range = (lo, hi) => lo === hi ? lo : `${lo}–${hi}`
+meanRange = (mean, lo, hi) => lo === hi ? fmt1(mean) : `${fmt1(mean)} (${lo}–${hi})`
+fieldRow = (label, value) => html`<tr><td style="color: var(--bs-secondary-color, #666); padding-right: 0.75rem;">${label}</td><td>${value}</td></tr>`
+// flex-grow: 0 -- cards size to their content (a fixed-ish 260px), rather
+// than stretching to fill the row, which looked odd with a single condition
+// claiming the whole row's width.
+conditionCard = row => html`<div style="border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 8px; padding: 0.75rem 1rem; flex: 0 1 260px; min-width: 240px;">
+  <h4 style="margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 600;">${row.condition_label}</h4>
+  <table style="font-size: 0.9rem; width: 100%;">
+    <tbody>
+      ${fieldRow("group size", row.group_size)}
+      ${fieldRow("population", row.population)}
+      ${fieldRow("partner constancy", row.partner_constancy)}
+      ${fieldRow("role constancy", row.role_constancy)}
+      ${fieldRow("modality", row.modality)}
+      ${fieldRow("feedback", row.feedback)}
+      ${fieldRow("backchannel", row.backchannel)}
+      ${fieldRow("language", row.language)}
+      ${fieldRow("# games", row.n_games)}
+      ${fieldRow("total trials", row.total_trials)}
+      ${fieldRow("players / game", meanRange(row.mean_players, row.min_players, row.max_players))}
+      ${fieldRow("rounds / game", meanRange(row.mean_rounds, row.min_rounds, row.max_rounds))}
+      ${fieldRow("trials / game", meanRange(row.mean_trials, row.min_trials, row.max_trials))}
+      ${fieldRow("# images", row.n_images_total)}
+      ${fieldRow("option set size", range(row.min_option_set_size, row.max_option_set_size))}
+      ${fieldRow("trials w/ selections", `${row.n_trials_with_selections} / ${row.total_trials}`)}
+      ${fieldRow("trials w/ messages", `${row.n_trials_with_messages} / ${row.total_trials}`)}
+    </tbody>
+  </table>
+</div>`
+```
+
+```{ojs}
+hasSelection
+  ? html`<div>
+      <p style="font-size: 0.85rem; color: var(--bs-secondary-color, #666); margin-bottom: 0.5rem;">When there is a range, the mean (min–max) is shown.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 1rem;">${selected_condition_rows.map(conditionCard)}</div>
+    </div>`
+  : html`<p><em>Choose a dataset above to see its summary.</em></p>`
+```
+
+```{ojs}
+//| output: false
+readme_text = {
+  if (!hasSelection) return "";
+  const url = `https://raw.githubusercontent.com/langcog/refbank-import/main/import/${selected_dataset}/readme.md`;
+  // the readme's own top-level "# Readme" heading is redundant with this
+  // section already being about the readme -- shift every heading down two
+  // levels so the fetched content nests properly under our own h3 sections
+  // instead of jumping back up to h1/h2 and repeating "Readme" as a heading.
+  const demote = text => text.replace(/^(#{1,4})(\s)/gm, (m, hashes, space) => "#".repeat(Math.min(hashes.length + 2, 6)) + space);
+  try {
+    const resp = await fetch(url);
+    return resp.ok ? demote(await resp.text()) : `_Couldn't load readme for ${selected_dataset} (${resp.status}). [View on GitHub](${url}).`;
+  } catch (e) {
+    return `_Couldn't load readme for ${selected_dataset}. [View on GitHub](${url}).`;
+  }
+}
+```
+
+```{ojs}
+hasSelection ? md`${readme_text}` : html``
+```
