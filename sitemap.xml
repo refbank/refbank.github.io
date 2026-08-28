@@ -2,22 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://refbank.github.io/contributors.html</loc>
-    <lastmod>2026-08-05T00:45:54.087Z</lastmod>
-  </url>
-  <url>
-    <loc>https://refbank.github.io/data.html</loc>
-    <lastmod>2026-08-05T00:45:54.087Z</lastmod>
-  </url>
-  <url>
-    <loc>https://refbank.github.io/about.html</loc>
-    <lastmod>2026-08-05T00:45:54.087Z</lastmod>
-  </url>
-  <url>
-    <loc>https://refbank.github.io/analysis.html</loc>
-    <lastmod>2026-08-05T00:45:54.087Z</lastmod>
+    <lastmod>2026-08-28T16:45:01.250Z</lastmod>
   </url>
   <url>
     <loc>https://refbank.github.io/index.html</loc>
-    <lastmod>2026-08-05T00:45:54.088Z</lastmod>
+    <lastmod>2026-08-28T16:45:01.251Z</lastmod>
+  </url>
+  <url>
+    <loc>https://refbank.github.io/analysis.html</loc>
+    <lastmod>2026-08-28T16:45:01.250Z</lastmod>
+  </url>
+  <url>
+    <loc>https://refbank.github.io/about.html</loc>
+    <lastmod>2026-08-28T16:45:01.250Z</lastmod>
+  </url>
+  <url>
+    <loc>https://refbank.github.io/data.html</loc>
+    <lastmod>2026-08-28T16:45:01.250Z</lastmod>
   </url>
 </urlset>
