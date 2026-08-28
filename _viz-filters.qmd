@@ -5,7 +5,7 @@
 // feedback/backchannel use the same fixed 3-level scale app.R hardcodes.
 group_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.group_size)))).sort((a, b) => a - b)
 option_size_choices = Array.from(new Set(game_summary_rows.map(d => String(d.option_set_size)))).sort((a, b) => a - b)
-rep_choices = d3.range(1, 14)
+round_choices = d3.range(1, 14)
 population_choices = Array.from(new Set(game_summary_rows.map(d => d.population))).sort()
 modality_choices = Array.from(new Set(game_summary_rows.map(d => d.modality))).sort()
 dataset_choices = Array.from(new Set(game_summary_rows.map(d => d.dataset_id))).sort()
@@ -26,7 +26,7 @@ facetingOpts = new Map([["None", "dataset_id"]].concat(Array.from(groupingOpts).
 ```{ojs}
 //| panel: input
 
-viewof rep_range = rangeSlider(rep_choices, { label: "Repetition", defaultRange: [0, 5] })
+viewof round_range = rangeSlider(round_choices, { label: "Round", defaultRange: [0, 5] })
 viewof group_size_range = rangeSlider(group_size_choices, { label: "Group size" })
 viewof option_size_range = rangeSlider(option_size_choices, { label: "Option set size" })
 
@@ -47,7 +47,7 @@ viewof stage_one_only = Inputs.toggle({ value: true, label: "Only include first 
 // scale is the standard choice. It's a no-op everywhere else: proportions
 // (accuracy, POS/NP fractions) are bounded and can hit 0/1, and cosine
 // similarities (embedding tab) can go negative — neither suits a log scale.
-viewof log_rep_axis = Inputs.toggle({ value: false, label: "Log x-axis (repetition)" })
+viewof log_round_axis = Inputs.toggle({ value: false, label: "Log x-axis (round)" })
 viewof log_y_axis = Inputs.toggle({ value: false, label: "Log y-axis (count-based plots)" })
 
 // Select-all/none buttons sit in their own row right after the "Dataset" label
@@ -83,13 +83,13 @@ viewof dataset = {
 ```{ojs}
 //| output: false
 filtered = {
-  const [repLo, repHi] = rep_range
+  const [roundLo, roundHi] = round_range
   const [groupSizeLo, groupSizeHi] = group_size_range
   const [optionSizeLo, optionSizeHi] = option_size_range
   return game_summary_rows.filter(d =>
     (!stage_one_only || d.stage_num === 1) &&
     dataset.includes(d.dataset_id) &&
-    repLo <= d.round_num && d.round_num <= repHi &&
+    roundLo <= d.round_num && d.round_num <= roundHi &&
     groupSizeLo <= Number(d.group_size) && Number(d.group_size) <= groupSizeHi &&
     optionSizeLo <= Number(d.option_set_size) && Number(d.option_set_size) <= optionSizeHi &&
     population.includes(d.population) &&

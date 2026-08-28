@@ -8,7 +8,7 @@ linePlot(filtered.filter(d => Number.isFinite(d.to_next)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
@@ -22,7 +22,7 @@ linePlot(filtered.filter(d => Number.isFinite(d.diverge)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
@@ -36,7 +36,7 @@ linePlot(filtered.filter(d => Number.isFinite(d.diff)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
@@ -50,6 +50,6 @@ linePlot(filtered.filter(d => Number.isFinite(d.idiosyncrasy)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```

@@ -3,7 +3,7 @@
   document.getElementById("viz-loading")?.remove()
   return linePlot(filtered.filter(d => Number.isFinite(d.words)), {
     y: "words",
-    title: "Reduction: Total speaker utterance length across repetitions",
+    title: "Reduction: Total speaker utterance length across rounds",
     yLabel: "Length (words)",
     ylim: [0, 60],
     groupingVar: grouping,
@@ -11,7 +11,7 @@
     indivLines: indiv_lines,
     stageOneOnly: stage_one_only,
     containerWidth: mainWidth,
-    logX: log_rep_axis,
+    logX: log_round_axis,
     logY: log_y_axis,
     logLogTrend: true
   })
@@ -21,28 +21,28 @@
 ```{ojs}
 linePlot(filtered.filter(d => Number.isFinite(d.accuracy)), {
   y: "accuracy",
-  title: "Accuracy across repetitions",
+  title: "Accuracy across rounds",
   yLabel: "Accuracy",
   groupingVar: grouping,
   facetVar: faceting,
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
 ```{ojs}
 linePlot(filtered.filter(d => Number.isFinite(d.rt)), {
   y: "rt",
-  title: "Response time across repetitions",
+  title: "Response time across rounds",
   yLabel: "Response time (s)",
   groupingVar: grouping,
   facetVar: faceting,
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis,
+  logX: log_round_axis,
   logY: log_y_axis,
   logLogTrend: true
 })

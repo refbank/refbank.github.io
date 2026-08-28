@@ -19,7 +19,7 @@ posLongRows = meltRows(
 ```{ojs}
 linePlot(filtered.filter(d => Number.isFinite(d.n_hedges)), {
   y: "n_hedges",
-  title: "Hedges across repetitions",
+  title: "Hedges across rounds",
   yLabel: "Hedges per trial",
   ylim: [0, 5],
   groupingVar: grouping,
@@ -27,7 +27,7 @@ linePlot(filtered.filter(d => Number.isFinite(d.n_hedges)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis,
+  logX: log_round_axis,
   logY: log_y_axis,
   logLogTrend: true
 })
@@ -48,7 +48,7 @@ linePlot(npLongRows.filter(d => Number.isFinite(d.np_count)), {
   indivLines: false,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
@@ -67,7 +67,7 @@ linePlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
   indivLines: indiv_lines,
   stageOneOnly: stage_one_only,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```
 
@@ -80,6 +80,6 @@ stackPlot(posLongRows.filter(d => Number.isFinite(d.pos_frac)), {
   groupLabel: "Part of speech",
   facetVar: faceting,
   containerWidth: mainWidth,
-  logX: log_rep_axis
+  logX: log_round_axis
 })
 ```

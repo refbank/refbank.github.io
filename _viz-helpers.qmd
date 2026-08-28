@@ -370,7 +370,7 @@ theme_Flat = `
 ```{ojs}
 //| output: false
 // A two-handle range slider over a discrete, possibly non-uniformly-spaced
-// choice array (repetition numbers, or the group/option-size values present in
+// choice array (round numbers, or the group/option-size values present in
 // the data). Wraps `interval()` above, operating on indices so the two handles
 // are always evenly spaced regardless of the underlying values' spacing;
 // `format`/`.value` map back to the actual values. Returns a <form> so it
@@ -501,7 +501,7 @@ function weightedLogTrend(rows, { x, y, weight }) {
 
 // Weighted least squares fit of log(y) ~ log(x), weighted by `weight` — a
 // power-law fit (y = exp(a) * x^b), used for measures like utterance length
-// and response time that reduce proportionally across repetitions rather than
+// and response time that reduce proportionally across rounds rather than
 // by a fixed amount per log-step. Returns a predict(x) => {y, lo, hi} function
 // (95% CI band, transformed back out of log-y space), or null if there isn't
 // enough data to fit (fewer than 3 valid points, or zero x-variance). Rows
@@ -684,7 +684,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   // otherwise numeric columns like group_size/option_set_size won't match the domain.
   const colorChannel = d => String(d[groupingVar])
 
-  // Ticks beyond the data's actual x-extent (e.g. the Repetition filter
+  // Ticks beyond the data's actual x-extent (e.g. the Round filter
   // narrowed to 1–6, but the full possible range is 1–13): a plain
   // `Plot.plot()` silently drops out-of-domain ticks, but with fx/fy
   // faceting Plot still tries to place all of them, projecting the
@@ -823,7 +823,7 @@ function linePlot(rows, { y, title, yLabel, ylim = null, groupingVar, facetVar, 
   const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
   const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
   const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
-  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition${logX ? " (log scale)" : ""} →</div>`
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Round${logX ? " (log scale)" : ""} →</div>`
 
   if (!showLegend) return html`<div>${heading}${plot}${xCaption}</div>`
 
@@ -863,7 +863,7 @@ function meltRows(rows, columns, keyName, valueName) {
 ```{ojs}
 //| output: false
 // Mirrors app.R's make_stack_plot: a stacked-area chart of mean(y) per
-// repetition, stacked by `groupingVar` (always POS type on the PoS tab — this
+// round, stacked by `groupingVar` (always POS type on the PoS tab — this
 // has no "color by dataset_id" default-grouping sentinel the way linePlot
 // does, since a stack always needs an actual categorical variable to stack
 // by). Shares linePlot's facet-grid sizing/labeling/caption/legend chrome;
@@ -890,7 +890,7 @@ function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWid
   const panelHeight = Math.round(Math.min(MAX_PLOT_HEIGHT, Math.max(MIN_PLOT_HEIGHT,
     panelWidth / (isFaceted ? ASPECT_FACETED : ASPECT_SINGLE))))
 
-  // Aggregate to mean(y) per repetition × facet level × grouping level —
+  // Aggregate to mean(y) per round × facet level × grouping level —
   // `d3.rollup`'s nested Map needs manual flattening back into plain rows.
   const finite = rows.filter(d => Number.isFinite(d[y]))
   const rolled = isFaceted
@@ -962,7 +962,7 @@ function stackPlot(rows, { y, title, yLabel, groupingVar, facetVar, containerWid
   const lastRowFilled = isFaceted ? (facetKeys.length % ncol || ncol) : 1
   const plotAreaWidth = plotWidth - PLOT_MARGIN_LEFT - PLOT_MARGIN_RIGHT
   const xCaptionWidth = PLOT_MARGIN_LEFT + plotAreaWidth * (lastRowFilled / ncol)
-  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Repetition${logX ? " (log scale)" : ""} →</div>`
+  const xCaption = html`<div style="text-align: right; font-size: 1rem; margin-top: 2px; width: ${xCaptionWidth}px;">Round${logX ? " (log scale)" : ""} →</div>`
 
   const legendTitle = groupLabel ?? Array.from(groupingOpts).find(([, key]) => key === groupingVar)?.[0] ?? groupingVar
   const legendEl = html`<div style="margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 1rem;">
